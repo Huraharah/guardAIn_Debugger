@@ -1,0 +1,20 @@
+mcp_py/.venv
+
+# Visual Studio user-specific files
+.vs/
+*.user
+*.userosscache
+*.suo
+
+# Visual Studio generated files
+*.VC.db
+*.VC.opendb
+*.ipch
+
+# Build output
+bin/
+obj/
+Debug*/
+Release*/
+x64/
+x86/
