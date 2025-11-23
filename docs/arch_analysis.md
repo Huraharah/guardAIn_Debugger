@@ -1,5 +1,6 @@
 ﻿## Static Analysis Flow (runStaticAnalysis)
 
+```mermaid
 sequenceDiagram
 
     actor User
@@ -35,11 +36,13 @@ sequenceDiagram
     Core-->>UI: StaticAnalysisSummary
 
     UI->>User: Show overview, functions, suspicious regions
+```
 
 ### ---------------------------------------------------------------------------
 
 ## Dynamic Snapshot and Explanation Flow (captureSnapshot & /context/explain)
 
+```mermaid
 sequenceDiagram
 
     actor User
@@ -73,11 +76,13 @@ sequenceDiagram
 
     Core-->>UI: SnapshotSummary + explanation
     UI->>User: Show call stack, key vars, AI explanation
+```
 
 ### ---------------------------------------------------------------------------
 
 ## State Comparison Flow (compareSnapshots & /context/compare)
 
+```mermaid
 sequenceDiagram
 
     actor User
@@ -111,11 +116,13 @@ sequenceDiagram
     AM-->>Core: SnapshotComparisonSummary
     Core-->>UI: Summary + list of key changes
     UI->>User: Show side-by-side diff and explanation
+```
 
 ### ---------------------------------------------------------------------------
 
 ## Hybrid Flow: Dynamic Snapshot with Static Context
 
+```mermaid
 sequenceDiagram
 
     actor User
@@ -150,3 +157,4 @@ sequenceDiagram
     AM-->>Core: SnapshotSummary (with deeper context)
     Core-->>UI: Update snapshot view
     UI->>User: Show explanation referencing\nboth runtime state and static function behavior
+```
