@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="guardAInDBG.vcxproj" Id="7ed2a324-761d-4a61-8107-25f490fe8312" />
+</Solution>

@@ -1,7 +1,10 @@
 ```mermaid
 flowchart TD
-    subgraph CallStack[Call Path]
+    subgraph CallStackMCP[Call Path]
         UI[UI Layer] --> DC[DebuggerCore] --> AM[AnalysisManager] --> IBC[IBackendClient/McpClient] --> MCP[MCP Backend]
+    end
+    subgraph CallStackRuntime[Call Path]
+        UI --> DC --> AM --> IBC --> RT[RuntimeManager]
     end
 
     subgraph ErrorSources[Possible Error Sources]
@@ -17,6 +20,7 @@ flowchart TD
     ES4 --> DC
 
     MCP -->|returns success:false\nor HTTP error| IBC
+    RT -->|VM/container error\nor snapshot failure| IBC
     IBC -->|BackendResponse success=false, \n errorMessage| AM
     AM -->|marks Session.state=Error\nadds BackendMessage log | DC
     DC -->|ErrorResult / status| UI

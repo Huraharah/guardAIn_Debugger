@@ -15,11 +15,13 @@ graph TD
     SR[SuspiciousRegion]
     EX[Explanation]
     SC[StateChange]
+    RT[RuntimeManager]
 
     %% DebuggerCore dependencies
     DC --> SM
     DC --> AM
     DC --> IBC
+    DC --> RT
 
     %% SessionManager dependencies
     SM --> SES
@@ -30,6 +32,10 @@ graph TD
     AM --> SNP
     AM --> SCM
     AM --> IBC
+
+    %% RuntimeManager dependencies
+    RT --> IBC
+    RT --> SES
 
     %% Backend client
     MCP --> IBC

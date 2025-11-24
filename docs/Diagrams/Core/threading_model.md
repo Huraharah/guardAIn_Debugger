@@ -9,6 +9,7 @@ flowchart LR
         DC --> TM[Task/Job Manager]
         TM --> AM[AnalysisManager]
         TM --> SM[SessionManager]
+        TM --> RM[RuntimeManager]
     end
 
     subgraph BackendThread[Backend Communication]
@@ -21,3 +22,4 @@ flowchart LR
         MCP --> GH[Ghidra Headless]
         MCP --> LLM[LLM / AI Service]
     end
+```

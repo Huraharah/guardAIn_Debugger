@@ -1,23 +1,32 @@
 ```mermaid
 flowchart LR
-    UI[UI Layer -- Win/XAML] 
+    UI[UI Layer]
     DC[DebuggerCore]
+
     SM[SessionManager]
     AM[AnalysisManager]
-    BC[IBackendClient / McpClient]
+    RM[RuntimeManager]
+
+    BC[IBackendClient -- McpClient]
     MCP[MCP Backend -- Python]
-    GH[Ghidra -- Java]
+    GH[Ghidra]
     LLM[LLM / AI Model]
+
+    QEMU[QEMU/Container Manager]
+    TARGET[Target Program -- in sandbox]
 
     UI --> DC
 
     DC --> SM
     DC --> AM
+    DC --> RM
 
     AM --> BC
-
     BC --> MCP
-
     MCP --> GH
     MCP --> LLM
+
+    RM --> QEMU
+    QEMU --> TARGET
+
 ```
