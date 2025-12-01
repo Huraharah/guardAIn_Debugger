@@ -12,11 +12,11 @@ flowchart LR
         MCP --> RTR[RequestRouter]
 
         subgraph Handlers[Handlers]
-            GH[GhidraHandler\n/ghidra/analyze, /ghidra/apply_renames]
-            CTX[ContextHandler\n/context/explain, /context/compare]
-            NM[NamingHandler\n/naming/suggest]
-            MI[ModelIntrospectionHandler\n/model/introspect]
-            HL[HealthHandler\n/health]
+            GH[GhidraHandler<br/>/ghidra/analyze, /ghidra/apply_renames]
+            CTX[ContextHandler<br/>/context/explain, /context/compare]
+            NM[NamingHandler<br/>/naming/suggest]
+            MI[ModelIntrospectionHandler<br/>/model/introspect]
+            HL[HealthHandler<br/>/health]
         end
 
         RTR --> GH
@@ -50,7 +50,7 @@ flowchart LR
     end
 
     subgraph External[External Tools / Services]
-        GHIDRA[Ghidra Headless\n+ Analysis Scripts]
+        GHIDRA[Ghidra Headless<br/>+ Analysis Scripts]
         LLM[LLM Provider<br/>OpenAI / local]
         FS[(Filesystem<br/>temp dirs, projects)]
     end

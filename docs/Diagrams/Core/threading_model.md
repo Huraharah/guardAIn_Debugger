@@ -6,14 +6,14 @@ flowchart LR
     end
 
     subgraph CoreThread[Core / Worker Threads]
-        DC --> TM[Task/Job Manager]
+        DC --> TM[Task / Job Manager]
         TM --> AM[AnalysisManager]
         TM --> SM[SessionManager]
         TM --> RM[RuntimeManager]
     end
 
     subgraph BackendThread[Backend Communication]
-        AM --> BC[IBackendClient/McpClient]
+        AM --> BC[IBackendClient / McpClient]
         BC --> NET[HTTP Client / IPC]
     end
 

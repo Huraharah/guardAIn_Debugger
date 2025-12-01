@@ -190,6 +190,7 @@ classDiagram
     BackendMessage --> MessageDirection
     BackendMessage --> BackendStatus
 ```
+
 ```cpp
 struct FunctionInfo {
     std::string id;

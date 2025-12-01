@@ -4,22 +4,22 @@
 stateDiagram-v2
     [*] --> New
 
-    New --> Configured: validate target\n(load settings)
+    New --> Configured: validate target<br/>(load settings)
     Configured --> StaticAnalyzing: runStaticAnalysis()
     Configured --> DynamicRunning: startDynamicSession()
 
     StaticAnalyzing --> StaticReady: analysis success
     StaticAnalyzing --> Error: analysis failed
 
-    StaticReady --> DynamicRunning: attach debugger\n(optional hybrid)
+    StaticReady --> DynamicRunning: attach debugger<br/>(optional hybrid)
     StaticReady --> Completed: user marks done
 
     DynamicRunning --> SnapshotAvailable: captureSnapshot()
-    SnapshotAvailable --> SnapshotAvailable: captureSnapshot()\n(more snapshots)
+    SnapshotAvailable --> SnapshotAvailable: captureSnapshot()<br/>(more snapshots)
     SnapshotAvailable --> Completed: user marks done
 
     Configured --> Error: configuration error
-    DynamicRunning --> Error: backend failure\nor target crashed
+    DynamicRunning --> Error: backend failure<br/>or target crashed
     SnapshotAvailable --> Error: backend failure
 
     Completed --> Closed: closeSession()

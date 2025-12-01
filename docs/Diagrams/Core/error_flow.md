@@ -8,8 +8,8 @@ flowchart TD
     end
 
     subgraph ErrorSources[Possible Error Sources]
-        ES1[Network failure \n backend unreachable]
-        ES2[Ghidra error \n analysis failure]
+        ES1[Network failure <br/> backend unreachable]
+        ES2[Ghidra error <br/> analysis failure]
         ES3[JSON parse error]
         ES4[Invalid session state]
     end
@@ -19,14 +19,14 @@ flowchart TD
     ES3 --> AM
     ES4 --> DC
 
-    MCP -->|returns success:false\nor HTTP error| IBC
-    RT -->|VM/container error\nor snapshot failure| IBC
-    IBC -->|BackendResponse success=false, \n errorMessage| AM
-    AM -->|marks Session.state=Error\nadds BackendMessage log | DC
+    MCP -->|returns success:false<br/>or HTTP error| IBC
+    RT -->|VM/container error<br/>or snapshot failure| IBC
+    IBC -->|BackendResponse success=false, <br/> errorMessage| AM
+    AM -->|marks Session.state=Error<br/>adds BackendMessage log | DC
     DC -->|ErrorResult / status| UI
-    UI -->|Display user-friendly error\nand possible recovery actions| User
+    UI -->|Display user-friendly error<br/>and possible recovery actions| User
 
     %% Local core errors
     AM -->|local validation error| DC
-    DC -->|cannot perform operation\nin current SessionState| UI
+    DC -->|cannot perform operation<br/>in current SessionState| UI
 ```

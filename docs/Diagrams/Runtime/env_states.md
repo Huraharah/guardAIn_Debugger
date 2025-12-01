@@ -3,8 +3,8 @@ stateDiagram-v2
     [*] --> NotCreated
 
     NotCreated --> Creating: createEnvironment(config)
-    Creating --> Ready: env created\nsandbox ready
-    Creating --> Error: creation failed\n(e.g. QEMU error)
+    Creating --> Ready: env created<br/>sandbox ready
+    Creating --> Error: creation failed<br/>(e.g. QEMU error)
 
     Ready --> Running: launchTarget()
     Ready --> Destroying: destroyEnvironment()
@@ -12,7 +12,7 @@ stateDiagram-v2
     Running --> Paused: pauseAllTargets()
     Paused --> Running: resumeTargets()
 
-    Running --> Stopping: destroyEnvironment()\n(all targets terminating)
+    Running --> Stopping: destroyEnvironment()<br/>(all targets terminating)
     Paused --> Stopping: destroyEnvironment()
 
     Stopping --> Terminated: cleanup complete
