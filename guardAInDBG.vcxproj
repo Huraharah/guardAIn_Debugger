@@ -105,9 +105,10 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>A:\guardAInDBG\Code\Runtime\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
@@ -127,13 +128,27 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Code\Runtime\include\GDBRemoteController.h" />
+    <ClInclude Include="Code\Runtime\include\LLMInterface.h" />
+    <ClInclude Include="Code\Runtime\include\QEMUController.h" />
+    <ClInclude Include="Code\Runtime\include\QmpClient.h" />
+    <ClInclude Include="Code\Runtime\include\RuntimeManager.h" />
+    <ClInclude Include="Code\Runtime\include\SshHelper.h" />
+    <ClInclude Include="Code\Runtime\include\TraceCollector.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="guardAInDBG.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="guardAInDBG.cpp" />
+    <ClCompile Include="Code\Runtime\src\GDBRemoteController.cpp" />
+    <ClCompile Include="Code\Runtime\src\LLMInterface.cpp" />
+    <ClCompile Include="Code\Runtime\src\main.cpp" />
+    <ClCompile Include="Code\Runtime\src\QEMUController.cpp" />
+    <ClCompile Include="Code\Runtime\src\QmpClient.cpp" />
+    <ClCompile Include="Code\Runtime\src\RuntimeManager.cpp" />
+    <ClCompile Include="Code\Runtime\src\SshHelper.cpp" />
+    <ClCompile Include="Code\Runtime\src\TraceCollector.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="guardAInDBG.rc" />
@@ -141,6 +156,9 @@
   <ItemGroup>
     <Image Include="guardAInDBG.ico" />
     <Image Include="small.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

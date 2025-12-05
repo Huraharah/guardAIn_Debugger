@@ -1,0 +1,6 @@
+{
+  "qemu": {
+    "executable": "A:\\QEMU\\qemu-system-x86_64.exe",
+    "defaultArgs": "-accel tcg -nographic -version"
+  }
+}
