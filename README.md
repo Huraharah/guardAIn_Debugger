@@ -79,7 +79,7 @@ Each milestone is broken down into concrete, checkable tasks.
 
 ---
 
-#### :white_large_square: Milestone 3 – First Run: “Natural” Execution & Trace Collection
+#### :white_check_mark: Milestone 3 – First Run: “Natural” Execution & Trace Collection
 
 **Goal:** Boot a real guest Linux VM under QEMU, then (eventually) run a sample with basic tracing. Start simple and grow.
 
@@ -225,3 +225,45 @@ Each milestone is broken down into concrete, checkable tasks.
 ### Development Notes
 
 - Snapshot commands failed in minimal test environment; need to verify QEMU build has snapshot support, and how to invoke them correctly.
+
+---
+---
+
+## Core
+
+### Development Roadmap
+
+High-level design of core components and their interactions.
+
+#### Milestone 0 – Project Skeleton & Scaffolding
+```
+TODO: figure out milestones for core components and their interactions within and without the CoreEngine.
+```
+
+---
+---
+
+## UI
+
+### Development Roadmap
+
+High-level design of UI components and their interactions.
+
+#### Milestone 0 – Project Skeleton & Scaffolding
+```
+TODO: figure out milestones for UI components and their interactions.
+```
+
+---
+---
+
+## MCP
+
+### Development Roadmap
+
+High-level design of MCP components and their interactions.
+
+#### Milestone 0 – Project Skeleton & Scaffolding
+```
+TODO: figure out milestones for MCP components and their interactions.
+```
