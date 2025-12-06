@@ -128,7 +128,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Code\Runtime\include\GDBRemoteController.h" />
     <ClInclude Include="Code\Runtime\include\LLMInterface.h" />
     <ClInclude Include="Code\Runtime\include\QEMUController.h" />
     <ClInclude Include="Code\Runtime\include\QmpClient.h" />
@@ -141,7 +140,6 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Code\Runtime\src\GDBRemoteController.cpp" />
     <ClCompile Include="Code\Runtime\src\LLMInterface.cpp" />
     <ClCompile Include="Code\Runtime\src\main.cpp" />
     <ClCompile Include="Code\Runtime\src\QEMUController.cpp" />

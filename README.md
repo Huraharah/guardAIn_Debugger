@@ -53,7 +53,7 @@ Each milestone is broken down into concrete, checkable tasks.
 
 ---
 
-#### :x:  Milestone 2 – QMP Control & Baseline Snapshot
+#### :white_check_mark:  Milestone 2 – QMP Control & Baseline Snapshot
 
 **Goal:** Programmatically talk to QEMU via QMP and create a baseline snapshot.
 
@@ -65,10 +65,10 @@ Each milestone is broken down into concrete, checkable tasks.
   - [x] Read initial QMP greeting
   - [x] Send `{"execute": "qmp_capabilities"}` and parse response
   - [x] Implement `queryStatus()` (e.g., QMP `query-status`)
-- :exclamation: Add snapshot methods to `QemuController`
-  - :exclamation: `bool createSnapshot(const std::string& name)`
-  - :exclamation: `bool loadSnapshot(const std::string& name)`
-  - :exclamation: Handle errors from QMP and log them
+- [x] Add snapshot methods to `QemuController`
+  - [x] `bool createSnapshot(const std::string& name)`
+  - [x] `bool loadSnapshot(const std::string& name)`
+  - [x] Handle errors from QMP and log them
 - [x] Baseline workflow
   - [x] Boot VM manually to a clean state (guest OS installed & configured)
   - [x] From code, call `createSnapshot("baseline_clean")`
@@ -216,15 +216,16 @@ Each milestone is broken down into concrete, checkable tasks.
 
 ### Roadmap Issues
 
-#### :white_large_square: Milestone 2
+#### :white_check_mark: Milestone 2
 
-- [ ] Snapshot QEMU/QMP commands (savevm/loadvm) not found
+- [x] Snapshot QEMU/QMP commands (savevm/loadvm) not found
  
 ---
 
 ### Development Notes
 
 - Snapshot commands failed in minimal test environment; need to verify QEMU build has snapshot support, and how to invoke them correctly.
+    - Problem fixed by using qcow2 images and proper QEMU options ('-snapshot', creating per-sample image files). 
 
 ---
 ---

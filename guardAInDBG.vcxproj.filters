@@ -36,9 +36,6 @@
     <ClInclude Include="Code\Runtime\include\QEMUController.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Code\Runtime\include\GDBRemoteController.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Code\Runtime\include\TraceCollector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -54,9 +51,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Code\Runtime\src\QEMUController.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Code\Runtime\src\GDBRemoteController.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Code\Runtime\src\TraceCollector.cpp">

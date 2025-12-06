@@ -11,7 +11,7 @@ public:
     ~QEMUController();
 
     // For now, vmName is just for logging.
-    bool startVm(const std::string& vmName);
+    bool startVm(const std::string& vmName, bool useSnapshot = true);
 
     // Attempt to terminate the running QEMU process.
     bool stopVm();

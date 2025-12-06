@@ -36,7 +36,7 @@ QEMUController::~QEMUController()
     }
 }
 
-bool QEMUController::startVm(const std::string& vmName)
+bool QEMUController::startVm(const std::string& vmName, bool useSnapshot)
 {
     if (m_isRunning)
     {
@@ -49,14 +49,18 @@ bool QEMUController::startVm(const std::string& vmName)
     // NOTE: m_diskImagePath should be something like "A:\\VMs\\linux_base.qcow2"
     // For now we assume no spaces in path; if there are, we’ll need to quote it.
 	// TODO: Move these args to parameters and/or config later.
-    std::string args =
-        "-m 2048 "
-        "-M q35 "
-        "-accel tcg "
-        "-drive file=" + m_diskImagePath + ",if=virtio,format=qcow2 "
-        "-nic user,hostfwd=tcp::10022-:22 "
-        "-qmp tcp:localhost:4444,server,nowait "
-        "-nographic ";
+    std::string args;
+    args += "-m 2048 ";
+    args += "-M q35 ";
+    args += "-accel tcg ";
+    if (useSnapshot)
+    {
+        args += "-snapshot ";
+    }
+    args += "-drive file=" + m_diskImagePath + ",if=virtio,format=qcow2 ";
+    args += "-nic user,hostfwd=tcp::10022-:22 ";
+    args += "-qmp tcp:localhost:4444,server,nowait ";
+    args += "-nographic";
 
     std::cout << "[QEMUController] Starting VM '" << vmName << "' using:\n"
         << "    " << m_qemuExecutable << " " << args << "\n";
