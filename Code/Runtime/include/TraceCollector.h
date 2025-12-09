@@ -3,6 +3,16 @@
 #include <string>
 #include <map>
 #include <vector>
+#include "Logger.h"
+#include "RuntimeConfig.h"
+
+struct NetworkSummary
+{
+    bool hasCapture = false;
+    std::string pcapPath; // e.g. A:\artifacts\suspicious\run1\suspicious.pcap
+    std::vector<std::string> domainsResolved;
+    std::vector<std::string> ipsConnected;
+};
 
 struct TraceSummary
 {
@@ -25,11 +35,16 @@ struct TraceSummary
     std::string crashSignal;
     std::string crashInstructionPtr;  // e.g., "0x55555555765a"
     std::vector<std::string> backtraceLines;
+
+    // Network activity
+    NetworkSummary network;
 };
 
 class TraceCollector
 {
 public:
+    explicit TraceCollector(const RuntimeConfig& cfg);
+
     // artifactsRoot: A:\artifacts
     // sampleName: e.g. "suspicious"
     bool buildSummary(const std::string& artifactsRoot,
@@ -41,6 +56,8 @@ public:
         const std::string& summaryPath);
 
 private:
+	RuntimeConfig cfg_;
+
     void loadSha256(const std::string& staticDir, TraceSummary& summary);
     void analyzeStrace(const std::string& runDir, TraceSummary& summary);
     void analyzeLtrace(const std::string& runDir, TraceSummary& summary);

@@ -227,6 +227,12 @@ Each milestone is broken down into concrete, checkable tasks.
 - Snapshot commands failed in minimal test environment; need to verify QEMU build has snapshot support, and how to invoke them correctly.
     - Problem fixed by using qcow2 images and proper QEMU options ('-snapshot', creating per-sample image files). 
 
+- During Milestone 3, decided to work a major refactor of "RuntimeManager" to allow for a single orchestration function that can be called
+ in CLI with most of the info to configure the run passed in as parameters. This should simplify the UI portion significantly.
+- Additionally, switched from using a Fedora Server image to a minimal Debian cloud image for the QEMU guest - greatly reduced boot time per cycle
+    - Further optimized run by refactoring groups of processes together, such as all of the static tools are run in the same instance as the diff, etc. This reduced the number of boot cycles required.
+    - Total run time for full analysis at roughly 5 minutes per sample through Milestone 3, down from about 10-15 minutes.
+
 ---
 ---
 

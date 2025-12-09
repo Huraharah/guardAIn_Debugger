@@ -8,6 +8,11 @@
 
 namespace fs = std::filesystem;
 
+TraceCollector::TraceCollector(const RuntimeConfig& cfg)
+    : cfg_(cfg)
+{
+}
+
 // ---------- Small helpers ----------
 
 // Trim leading/trailing whitespace (for safety when parsing logs)
@@ -69,17 +74,39 @@ bool TraceCollector::buildSummary(const std::string& artifactsRoot,
     outSummary = TraceSummary{};
     outSummary.sampleName = sampleName;
 
-    fs::path base = fs::path(artifactsRoot) / sampleName;
+    fs::path base = fs::path(artifactsRoot);
     fs::path baselineDir = base / "baseline";
     fs::path staticDir = base / "static";
     fs::path runDir = base / "run1";
     fs::path debugDir = base / "debug";
+
+    /* Bug squashed for this whole block - retained for historical reference
+    Logger::debug("[TraceCollector] Artifact Path: " + base.string());
+    Logger::debug("[TraceCollector] Baseline Diff Path: " + baselineDir.string());
+    Logger::debug("[TraceCollector] Static Info Path: " + staticDir.string());
+    Logger::debug("[TraceCollector] First Run Info Path: " + runDir.string());
+    Logger::debug("[TraceCollector] Debug Info Path: " + debugDir.string());
+    */
 
     loadSha256(staticDir.string(), outSummary);
     analyzeStrace(runDir.string(), outSummary);
     analyzeLtrace(runDir.string(), outSummary);
     analyzeManifestDiff(baselineDir.string(), outSummary);
     analyzeDebugLog(debugDir.string(), outSummary);
+
+    /* Bug squashed for this whole block - retained for historical reference
+	Logger::debug("[TraceCollector] Built summary for sample " + sampleName);
+	Logger::debug("  SHA256: " + outSummary.sha256);
+    Logger::debug("  Syscalls observed : " + std::to_string(outSummary.syscallCounts.size()));
+	Logger::debug("  Library calls observed: " + std::to_string(outSummary.libcallCounts.size()));
+    Logger::debug("  Debug Crash Info: Signal: " + outSummary.crashSignal + " | Instruction Pointer: " + outSummary.crashInstructionPtr);
+    */
+
+    fs::path pcap = fs::path(runDir) / "network.pcap";
+    if (fs::exists(pcap)) {
+        outSummary.network.hasCapture = true;
+        outSummary.network.pcapPath = fs::relative(pcap, artifactsRoot).string();
+    }
 
     return true;
 }
@@ -93,10 +120,12 @@ bool TraceCollector::writeSummaryJson(const TraceSummary& s,
     std::ofstream out(path);
     if (!out)
     {
-        std::cerr << "[TraceCollector] Failed to open summary for write: "
-            << summaryPath << "\n";
+        Logger::error("[TraceCollector] Failed to open summary for write: "
+            + summaryPath);
         return false;
     }
+
+    Logger::debug("[TraceCollector] Starting summary collation...");
 
     out << "{\n";
     out << "  \"sample\": \"" << s.sampleName << "\",\n";
@@ -165,6 +194,9 @@ bool TraceCollector::writeSummaryJson(const TraceSummary& s,
     out << "  }\n";
 
     out << "}\n";
+
+    Logger::debug("Summary Colation Complete - file written.");
+
     return true;
 }
 

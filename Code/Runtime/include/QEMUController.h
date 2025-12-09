@@ -1,13 +1,16 @@
 #pragma once
+
 #include <string>
 #include "QmpClient.h"
+#include "Logger.h"
+#include "RuntimeConfig.h"
 
 class QEMUController
 {
 public:
-    // qemuExecutable: full path to qemu-system-* binary
-    explicit QEMUController(const std::string& qemuExecutable,
-                            const std::string& diskImagePath);
+    // Construct from shared runtime configuration
+    explicit QEMUController(const RuntimeConfig& cfg);
+
     ~QEMUController();
 
     // For now, vmName is just for logging.
@@ -25,21 +28,35 @@ public:
     bool loadSnapshot(const std::string& name);
     bool queryStatus(); // wrapper around QMP query-status
 
+	// Util Getters/Setters
+	void setDiskImagePath(const std::string& path);
+    unsigned long getProcessID();
+    HANDLE getProcessHandle();
+
+    // Request guest shutdown via QMP (platform-specific, not always implemented)
+    bool requestGuestShutdownQmp();
+	bool waitForExitWithTimeoutMs(int timeoutMs);
+
 private:
+    RuntimeConfig cfg_;
+
     std::string m_qemuExecutable;
     std::string m_lastVmName;
+    std::string m_baseImagePath;
+	std::string m_vmDirectory;
+	std::string m_sampleDirectory;
+	std::string m_sampleName;
 	std::string m_diskImagePath;
-    bool m_isRunning;
+    bool        m_isRunning = false;
 
-	// QMP client
-	QmpClient* m_qmpClient;
-	std::string m_qmpHost;
-	int m_qmpPort;
-
+    // QMP client
+    QmpClient* m_qmpClient = nullptr;
+    std::string m_qmpHost;
+    int         m_qmpPort = 0;
 
 #ifdef _WIN32
-    void* m_processHandle;     // actually a HANDLE
-    unsigned long m_processId; // actually a DWORD
+    void* m_processHandle = nullptr;     // actually a HANDLE
+    unsigned long m_processId = 0;           // actually a DWORD
 #endif
 
     bool launchProcess(const std::string& arguments);

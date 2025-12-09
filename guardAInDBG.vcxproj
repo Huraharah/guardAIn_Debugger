@@ -129,8 +129,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Code\Runtime\include\LLMInterface.h" />
+    <ClInclude Include="Code\Runtime\include\Logger.h" />
     <ClInclude Include="Code\Runtime\include\QEMUController.h" />
     <ClInclude Include="Code\Runtime\include\QmpClient.h" />
+    <ClInclude Include="Code\Runtime\include\RuntimeConfig.h" />
     <ClInclude Include="Code\Runtime\include\RuntimeManager.h" />
     <ClInclude Include="Code\Runtime\include\SshHelper.h" />
     <ClInclude Include="Code\Runtime\include\TraceCollector.h" />
@@ -141,6 +143,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Code\Runtime\src\LLMInterface.cpp" />
+    <ClCompile Include="Code\Runtime\src\Logger.cpp" />
     <ClCompile Include="Code\Runtime\src\main.cpp" />
     <ClCompile Include="Code\Runtime\src\QEMUController.cpp" />
     <ClCompile Include="Code\Runtime\src\QmpClient.cpp" />

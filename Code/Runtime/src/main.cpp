@@ -3,19 +3,30 @@
 
 int main()
 {
-    const std::string qemuPath = "A:\\QEMU\\qemu-system-x86_64.exe";
-    const std::string diskImage = "A:\\VMs\\linux_base.qcow2";   // your Fedora Server qcow2 golden baseline image
-    const std::string sample = "A:\\Samples\\suspicious"; // placeholder for now
-	const std::string privateKey = "A:\\guardain_ed25519"; // your SSH private key for Fedora VM
-	const std::string artifactRoot = "A:\\artifacts";
+#ifdef _DEBUG
+	Logger::setMinLevel(LogLevel::Debug);
+#else
+	Logger::setMinLevel(LogLevel::Info);
+#endif
 
-    RuntimeManager rm(qemuPath, diskImage, privateKey,artifactRoot);
-	rm.prepareSampleImage(sample);
-	rm.runBaselineDiffPass(sample);
-    rm.runFirstPass(sample);
-    rm.runDebugPass(sample);
-	rm.runTraceCollectorForSample(sample);
+	RuntimeConfig cfg_;
+    cfg_.qemuBinary = "A:\\QEMU\\qemu-system-x86_64.exe";
+    cfg_.baseImagePath = "A:\\VMs\\linux_base.qcow2";   // your Fedora Server qcow2 golden baseline image
+	cfg_.vmDirectory = "A:\\VMs\\";
+	cfg_.artifactsRoot = "A:\\artifacts\\";
+    cfg_.sampleDirectory = "A:\\Samples\\"; // placeholder for now
+	cfg_.sampleName = "suspicious"; // placeholder for now
+	cfg_.sshHost = "127.0.0.1";
+	cfg_.sshPort = 10022; // your forwarded SSH port for Fedora VM
+	cfg_.sshUser = "analyst";
+	cfg_.sshKeyPath = "A:\\guardain_ed25519";
 
-    std::cout << "[main] Done.\n";
+	Logger::info("[GuardAInDBG Runtime] Starting");
+	Logger::debug("[GuardAInDBG Runtime] Debug information enabled");
+
+    RuntimeManager rm(cfg_);
+	rm.analyzeSample();
+
+    Logger::info("[GuardAInDBG Runtime] Done.");
     return 0;
 }

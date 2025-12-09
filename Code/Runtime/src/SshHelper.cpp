@@ -5,14 +5,11 @@
 #include <thread>
 #include <cstdlib>  // std::system
 
-SshHelper::SshHelper(const std::string& host,
-    const std::string& user,
-    int port,
-    const std::string& privateKeyPath)
-    : m_host(host),
-    m_user(user),
-    m_port(port),
-    m_privateKeyPath(privateKeyPath)
+SshHelper::SshHelper(const RuntimeConfig& cfg)
+    : m_host(cfg.sshHost),
+    m_user(cfg.sshUser),
+    m_port(cfg.sshPort),
+    m_privateKeyPath(cfg.sshKeyPath)
 {
 }
 
@@ -22,15 +19,15 @@ std::string SshHelper::buildCommonSshOptions() const
     std::string opts;
     opts += "-i \"" + m_privateKeyPath + "\" ";
     opts += "-o StrictHostKeyChecking=no ";
-    opts += "-o UserKnownHostsFile=NUL ";
+	opts += "-o UserKnownHostsFile=A:\\ssh_known_hosts ";
     opts += "-o BatchMode=yes ";
+    // Logger::debug("[SshHelper] Key File: " + m_privateKeyPath);     - [!] Bug squashed, retained for historical reference
     return opts;
 }
 
-bool SshHelper::waitForSsh(int timeoutSeconds)
+bool SshHelper::waitForReady(int timeoutSeconds)
 {
-    std::cout << "[SshHelper] Waiting for SSH on " << m_host
-        << ":" << m_port << " (timeout " << timeoutSeconds << "s)...\n";
+    Logger::info(std::string("[SshHelper] Waiting for SSH on ") + m_host + ":" + std::to_string(m_port) + " (timeout " + std::to_string(timeoutSeconds) + "s)...");
 
     const int sleepMillis = 2000;
     int waited = 0;
@@ -45,7 +42,7 @@ bool SshHelper::waitForSsh(int timeoutSeconds)
         int rc = std::system(cmd.c_str());
         if (rc == 0)
         {
-            std::cout << "[SshHelper] SSH is reachable and key auth works.\n";
+            Logger::info("[SshHelper] SSH is reachable and key auth works.");
             return true;
         }
 
@@ -53,28 +50,28 @@ bool SshHelper::waitForSsh(int timeoutSeconds)
         waited += sleepMillis;
     }
 
-    std::cerr << "[SshHelper] Timeout waiting for SSH.\n";
+    Logger::error("[SshHelper] Timeout waiting for SSH.");
     return false;
 }
 
-bool SshHelper::runRemoteCommand(const std::string& remoteCommand)
+bool SshHelper::runRemote(const std::string& remoteCommand)
 {
     // ssh: -p for port
     std::string cmd = "ssh -p " + std::to_string(m_port) + " "
         + buildCommonSshOptions()
         + m_user + "@" + m_host + " \"" + remoteCommand + "\"";
 
-    std::cout << "[SshHelper] Running remote command: " << cmd << "\n";
+    Logger::info("[SshHelper] Running remote command: " + cmd);
     int rc = std::system(cmd.c_str());
     if (rc != 0)
     {
-        std::cerr << "[SshHelper] ssh command failed with code " << rc << "\n";
+        Logger::error(std::string("[SshHelper] ssh command failed with code ") + std::to_string(rc));
         return false;
     }
     return true;
 }
 
-bool SshHelper::copyToGuest(const std::string& localPath,
+bool SshHelper::copyTo(const std::string& localPath,
     const std::string& remotePath)
 {
     // scp: -P (capital) for port
@@ -83,17 +80,17 @@ bool SshHelper::copyToGuest(const std::string& localPath,
         + localPath + " "
         + m_user + "@" + m_host + ":" + remotePath;
 
-    std::cout << "[SshHelper] Copying to guest: " << cmd << "\n";
+    Logger::info("[SshHelper] Copying to guest: " + cmd);
     int rc = std::system(cmd.c_str());
     if (rc != 0)
     {
-        std::cerr << "[SshHelper] scp (to guest) failed with code " << rc << "\n";
+        Logger::error(std::string("[SshHelper] SCP (to guest) failed with code ") + std::to_string(rc));
         return false;
     }
     return true;
 }
 
-bool SshHelper::copyFromGuest(const std::string& remotePath,
+bool SshHelper::copyFrom(const std::string& remotePath,
     const std::string& localPath)
 {
     // scp: -P (capital) for port
@@ -102,11 +99,11 @@ bool SshHelper::copyFromGuest(const std::string& remotePath,
         + m_user + "@" + m_host + ":" + remotePath + " "
         + localPath;
 
-    std::cout << "[SshHelper] Copying from guest: " << cmd << "\n";
+    Logger::info("[SshHelper] Copying from guest: " + cmd);
     int rc = std::system(cmd.c_str());
     if (rc != 0)
     {
-        std::cerr << "[SshHelper] scp (from guest) failed with code " << rc << "\n";
+        Logger::error(std::string("[SshHelper] scp (from guest) failed with code ") + std::to_string(rc));
         return false;
     }
     return true;

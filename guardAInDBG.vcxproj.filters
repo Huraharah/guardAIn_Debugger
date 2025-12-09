@@ -45,6 +45,12 @@
     <ClInclude Include="Code\Runtime\include\SshHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Code\Runtime\include\RuntimeConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Code\Runtime\include\Logger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Code\Runtime\src\RuntimeManager.cpp">
@@ -66,6 +72,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Code\Runtime\src\SshHelper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Code\Runtime\src\Logger.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

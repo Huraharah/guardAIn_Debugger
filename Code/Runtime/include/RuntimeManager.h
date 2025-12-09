@@ -1,39 +1,65 @@
 #pragma once
 
 #include <string>
+#include <functional>
+#include <memory>
+#include "RuntimeConfig.h"
+#include "Logger.h"
+#include "QEMUController.h"
+#include "SshHelper.h"
+#include "DebugController.h"
+#include "TraceCollector.h"
 
-class RuntimeManager
-{
+class RuntimeManager {
 public:
-    RuntimeManager(const std::string& qemuExecutablePath,
-        const std::string& baseDiskImagePath,
-        const std::string& privateKeyPath,
-        const std::string& artifactRoot);
+    explicit RuntimeManager(RuntimeConfig& cfg);
 
-    // One-time prep per sample: copy base image and bake sample into it.
-    // Returns full path to per-sample disk image, or empty string on error.
-    std::string prepareSampleImage(const std::string& samplePath);
-
-    // Baseline diff pass: no strace, just pre/post manifests + diff.
-    void runBaselineDiffPass(const std::string& samplePath);
-
-    // Your existing first-pass trace (we’ll tweak to use per-sample image):
-    void runFirstPass(const std::string& samplePath);
-
-	// Debug pass: run under gdbserver and collect debug artifacts.
-	void runDebugPass(const std::string& samplePath);
-
-    bool runTraceCollectorForSample(const std::string& samplePath);
+    // High-level “do everything” call:
+    bool analyzeSample();
 
 private:
-    std::string m_qemuExecutablePath;
-    std::string m_baseDiskImagePath;   // linux_base.qcow2
-    std::string m_privateKeyPath;      // e.g. A:\guardain_ed25519
-	std::string m_artifactsRoot;      // e.g. A:\Artifacts
+    RuntimeConfig cfg_;
+	QEMUController qemu_;
+	SshHelper ssh_;
+	TraceCollector trace_;
 
-    // Helper: extract "suspicious" from "A:\Samples\suspicious"
+    // Core pipeline helpers
+    bool prepareSampleImage(const std::string& sampleName,
+        std::string& outSampleDiskPath);
+
+    bool runBaselineDiffPass(const std::string& sampleName,
+        const std::string& sampleDiskPath,
+        const std::string& artifactsRoot);
+
+    bool runStaticToolsPass(const std::string& sampleName,
+        const std::string& sampleDiskPath,
+        const std::string& artifactsRoot);
+
+    bool runStracePass(const std::string& sampleName,
+        const std::string& sampleDiskPath,
+        const std::string& artifactsRoot,
+        int runIndex = 1);
+
+    bool runLtracePass(const std::string& sampleName,
+        const std::string& sampleDiskPath,
+        const std::string& artifactsRoot,
+        int runIndex = 1);
+
+    bool runDebugPass(const std::string& sampleName,
+        const std::string& sampleDiskPath,
+        const std::string& artifactsRoot);
+
+    // Generic snapshot-VM runner
+    bool runInSnapshotVm(const std::string& vmName,
+        const std::string& sampleDiskPath,
+        const std::function<bool(SshHelper&)>& work);
+
+    // Path helpers
     std::string extractSampleName(const std::string& samplePath) const;
-
-    // Helper: compute per-sample disk image path
-    std::string getSampleDiskImagePath(const std::string& sampleName) const;
+    std::string buildArtifactsRoot(const std::string& sampleName) const;
+    std::string buildBaselineDir(const std::string& artifactsRoot) const;
+    std::string buildStaticDir(const std::string& artifactsRoot) const;
+    std::string buildRunDir(const std::string& artifactsRoot, int runIndex) const;
+    std::string buildDebugDir(const std::string& artifactsRoot) const;
+    void        ensureDirectories(const std::string& path) const;
 };

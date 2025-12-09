@@ -1,4 +1,5 @@
 #include "QmpClient.h"
+
 #include <iostream>
 
 QmpClient::QmpClient(const std::string& host, int port)
@@ -25,7 +26,7 @@ bool QmpClient::initSocket()
         int res = WSAStartup(MAKEWORD(2, 2), &wsaData);
         if (res != 0)
         {
-            std::cerr << "[QmpClient] WSAStartup failed: " << res << "\n";
+            Logger::error("[QmpClient] WSAStartup failed: " + res);
             return false;
         }
         m_wsaInitialized = true;
@@ -81,16 +82,15 @@ bool QmpClient::connectToServer()
 
     if (sock == INVALID_SOCKET)
     {
-        std::cerr << "[QmpClient] Unable to connect to QMP at " << m_host
-            << ":" << m_port << "\n";
+        Logger::error(std::string("[QmpClient] Unable to connect to QMP at ") + m_host + ":" + std::to_string(m_port));
         return false;
     }
 
     m_socket = sock;
-    std::cout << "[QmpClient] Connected to QMP at " << m_host << ":" << m_port << "\n";
+    Logger::info(std::string("[QmpClient] Connected to QMP at ") + m_host + ":" + std::to_string(m_port));
     return true;
 #else
-    std::cerr << "[QmpClient] connectToServer not implemented on this platform.\n";
+    Logger::error("[QmpClient] connectToServer not implemented on this platform.");
     return false;
 #endif
 }
@@ -114,7 +114,7 @@ bool QmpClient::readMessage(std::string& out)
         }
         if (bytes < 0)
         {
-            std::cerr << "[QmpClient] recv failed. Error=" << WSAGetLastError() << "\n";
+            Logger::error("[QmpClient] recv failed. Error=" + WSAGetLastError());
             return false;
         }
 
@@ -149,7 +149,7 @@ bool QmpClient::sendRaw(const std::string& message)
         int res = send(m_socket, data + sent, total - sent, 0);
         if (res == SOCKET_ERROR)
         {
-            std::cerr << "[QmpClient] send failed. Error=" << WSAGetLastError() << "\n";
+            Logger::error("[QmpClient] send failed. Error=" + WSAGetLastError());
             return false;
         }
         sent += res;
@@ -167,7 +167,7 @@ bool QmpClient::negotiateCapabilities()
     std::string greeting;
     if (!readMessage(greeting))
     {
-        std::cerr << "[QmpClient] Failed to read QMP greeting.\n";
+        Logger::error("[QmpClient] Failed to read QMP greeting.");
         return false;
     }
 
@@ -179,18 +179,18 @@ bool QmpClient::negotiateCapabilities()
 
     if (!sendRaw(cmd))
     {
-        std::cerr << "[QmpClient] Failed to send qmp_capabilities.\n";
+        Logger::error("[QmpClient] Failed to send qmp_capabilities.");
         return false;
     }
 
     std::string response;
     if (!readMessage(response))
     {
-        std::cerr << "[QmpClient] Failed to read capabilities response.\n";
+        Logger::error("[QmpClient] Failed to read capabilities response.");
         return false;
     }
 
-    std::cout << "[QmpClient] Capabilities response: " << response;
+    Logger::info("[QmpClient] Capabilities response: " + response);
     return true;
 }
 
@@ -201,18 +201,18 @@ bool QmpClient::queryStatus()
 
     if (!sendRaw(cmd))
     {
-        std::cerr << "[QmpClient] Failed to send query-status.\n";
+        Logger::error("[QmpClient] Failed to send query-status.");
         return false;
     }
 
     std::string response;
     if (!readMessage(response))
     {
-        std::cerr << "[QmpClient] Failed to read query-status response.\n";
+        Logger::error("[QmpClient] Failed to read query-status response.");
         return false;
     }
 
-    std::cout << "[QmpClient] query-status response: " << response;
+    Logger::info("[QmpClient] query-status response: " + response);
     return true;
 }
 
@@ -226,18 +226,18 @@ bool QmpClient::saveSnapshot(const std::string& name)
 
     if (!sendRaw(cmd))
     {
-        std::cerr << "[QmpClient] Failed to send savevm.\n";
+        Logger::error("[QmpClient] Failed to send savevm.");
         return false;
     }
 
     std::string response;
     if (!readMessage(response))
     {
-        std::cerr << "[QmpClient] Failed to read savevm response.\n";
+        Logger::error("[QmpClient] Failed to read savevm response.");
         return false;
     }
 
-    std::cout << "[QmpClient] savevm response: " << response;
+    Logger::info("[QmpClient] savevm response: " + response);
     return true;
 }
 
@@ -251,18 +251,18 @@ bool QmpClient::loadSnapshot(const std::string& name)
 
     if (!sendRaw(cmd))
     {
-        std::cerr << "[QmpClient] Failed to send loadvm.\n";
+        Logger::error("[QmpClient] Failed to send loadvm.");
         return false;
     }
 
     std::string response;
     if (!readMessage(response))
     {
-        std::cerr << "[QmpClient] Failed to read loadvm response.\n";
+        Logger::error("[QmpClient] Failed to read loadvm response.");
         return false;
     }
 
-    std::cout << "[QmpClient] loadvm response: " << response;
+    Logger::info("[QmpClient] loadvm response: " + response);
     return true;
 }
 

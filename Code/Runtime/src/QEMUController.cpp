@@ -7,19 +7,25 @@
 #include <windows.h>
 #endif
 
-QEMUController::QEMUController(const std::string& qemuExecutable,
-                               const std::string& diskImagePath)
-    : m_qemuExecutable(qemuExecutable),
-    m_diskImagePath(diskImagePath),
+// Constructor definition must be qualified with the class name
+QEMUController::QEMUController(const RuntimeConfig& cfg)
+    : cfg_(cfg),
+    m_qemuExecutable(cfg.qemuBinary),         // Which QEMU binary to use - full path e.g. "A:\QEMU\qemu-system-x86_64.exe"
+    m_baseImagePath(cfg.baseImagePath),       // Full base image path e.g. "A:\VMs\linux_base.qcow2"
+    m_vmDirectory(cfg.vmDirectory),           // Where to store per-sample VM images e.g. "A:\VMs"
+	m_sampleDirectory(cfg.sampleDirectory),   // Where samples are stored on host e.g. "A:\samples"
+	m_sampleName(cfg.sampleName),             // Current sample name e.g. "suspicious"
+	m_diskImagePath(""),                      // To be set per-VM instance
     m_isRunning(false),
-    m_processHandle(nullptr),
-    m_processId(0),
     m_qmpClient(nullptr),
     m_qmpHost("127.0.0.1"),
     m_qmpPort(4444)
+#ifdef _WIN32
+    , m_processHandle(nullptr)
+    , m_processId(0)
+#endif
 {
 }
-
 
 QEMUController::~QEMUController()
 {
@@ -36,19 +42,34 @@ QEMUController::~QEMUController()
     }
 }
 
+void QEMUController::setDiskImagePath(const std::string& path)
+{
+    m_diskImagePath = path;
+	Logger::debug("[QEMUController] Disk image path set to : " + m_diskImagePath);
+}
+
+unsigned long QEMUController::getProcessID()
+{
+	return m_processId;
+}
+
+HANDLE QEMUController::getProcessHandle()
+{
+    return static_cast<HANDLE>(m_processHandle);
+}
+
 bool QEMUController::startVm(const std::string& vmName, bool useSnapshot)
 {
     if (m_isRunning)
     {
-        std::cerr << "[QEMUController] VM already running: " << m_lastVmName << "\n";
+        Logger::error("[QEMUController] VM already running: " + m_lastVmName);
         return false;
     }
 
     m_lastVmName = vmName;
 
-    // NOTE: m_diskImagePath should be something like "A:\\VMs\\linux_base.qcow2"
+    // NOTE: m_diskImagePath should be something like "A:\\VMs\\linux_suspicious.qcow2"
     // For now we assume no spaces in path; if there are, we’ll need to quote it.
-	// TODO: Move these args to parameters and/or config later.
     std::string args;
     args += "-m 2048 ";
     args += "-M q35 ";
@@ -62,8 +83,8 @@ bool QEMUController::startVm(const std::string& vmName, bool useSnapshot)
     args += "-qmp tcp:localhost:4444,server,nowait ";
     args += "-nographic";
 
-    std::cout << "[QEMUController] Starting VM '" << vmName << "' using:\n"
-        << "    " << m_qemuExecutable << " " << args << "\n";
+    Logger::info(std::string("[QEMUController] Starting VM '") + vmName + std::string("' using:"));
+    Logger::info(std::string("    ") + m_qemuExecutable + " " + args);
 
     bool ok = launchProcess(args);
     if (ok)
@@ -73,12 +94,11 @@ bool QEMUController::startVm(const std::string& vmName, bool useSnapshot)
     return ok;
 }
 
-
 bool QEMUController::stopVm()
 {
     if (!m_isRunning)
     {
-        std::cerr << "[QEMUController] stopVm() called but no VM is marked as running.\n";
+        Logger::error("[QEMUController] stopVm() called but no VM is marked as running.");
         return false;
     }
 
@@ -91,8 +111,7 @@ bool QEMUController::stopVm()
             if (exitCode != STILL_ACTIVE)
             {
                 // Process already exited on its own – this is fine.
-                std::cout << "[QEMUController] QEMU process (pid=" << m_processId
-                    << ") has already exited with code " << exitCode << ".\n";
+                Logger::warn(std::string("[QEMUController] QEMU process (pid=") + std::to_string(m_processId) + ") has already exited with code " + std::to_string(exitCode));
                 m_isRunning = false;
                 cleanupProcessHandle();
                 return true;
@@ -100,16 +119,14 @@ bool QEMUController::stopVm()
         }
         else
         {
-            std::cerr << "[QEMUController] GetExitCodeProcess failed. Error="
-                << GetLastError() << "\n";
+            Logger::error("[QEMUController] GetExitCodeProcess failed. Error=" + GetLastError());
         }
 
-        std::cout << "[QEMUController] Terminating QEMU process (pid=" << m_processId << ")...\n";
+        Logger::info(std::string("[QEMUController] Terminating QEMU process (pid=") + std::to_string(m_processId) + ")...");
 
         if (!TerminateProcess(static_cast<HANDLE>(m_processHandle), 0))
         {
-            std::cerr << "[QEMUController] TerminateProcess failed. Error="
-                << GetLastError() << "\n";
+            Logger::error("[QEMUController] TerminateProcess failed. Error=" + GetLastError());
             // We still fall through and cleanup; the process might be gone anyway.
         }
         else
@@ -158,7 +175,7 @@ bool QEMUController::launchProcess(const std::string& arguments)
 
     if (!success)
     {
-        std::cerr << "[QEMUController] Failed to launch process. Error=" << GetLastError() << "\n";
+        Logger::error("[QEMUController] Failed to launch process. Error=" + GetLastError());
         return false;
     }
 
@@ -168,11 +185,11 @@ bool QEMUController::launchProcess(const std::string& arguments)
     // We don't need the thread handle.
     CloseHandle(pi.hThread);
 
-    std::cout << "[QEMUController] QEMU started with pid=" << m_processId << "\n";
+    Logger::info("[QEMUController] QEMU started with pid=" + std::to_string(m_processId));
     return true;
 #else
     // TODO: Implement for non-Windows platforms later.
-    std::cerr << "[QEMUController] launchProcess not implemented for this platform.\n";
+    Logger::error("[QEMUController] launchProcess not implemented for this platform.);
     return false;
 #endif
 }
@@ -194,7 +211,7 @@ bool QEMUController::connectQmp(const std::string& host, int port)
 {
     if (!m_isRunning)
     {
-        std::cerr << "[QEMUController] Cannot connect QMP: VM is not running.\n";
+        Logger::error("[QEMUController] Cannot connect QMP: VM is not running.");
         return false;
     }
 
@@ -211,7 +228,7 @@ bool QEMUController::connectQmp(const std::string& host, int port)
     m_qmpClient = new QmpClient(m_qmpHost, m_qmpPort);
     if (!m_qmpClient->connectToServer())
     {
-        std::cerr << "[QEMUController] Failed to connect QMP client.\n";
+        Logger::error("[QEMUController] Failed to connect QMP client.");
         delete m_qmpClient;
         m_qmpClient = nullptr;
         return false;
@@ -219,7 +236,7 @@ bool QEMUController::connectQmp(const std::string& host, int port)
 
     if (!m_qmpClient->negotiateCapabilities())
     {
-        std::cerr << "[QEMUController] QMP capabilities negotiation failed.\n";
+        Logger::error("[QEMUController] QMP capabilities negotiation failed.");
         return false;
     }
 
@@ -230,7 +247,7 @@ bool QEMUController::createSnapshot(const std::string& name)
 {
     if (!m_qmpClient)
     {
-        std::cerr << "[QEMUController] createSnapshot called but QMP is not connected.\n";
+        Logger::error("[QEMUController] createSnapshot called but QMP is not connected.");
         return false;
     }
     return m_qmpClient->saveSnapshot(name);
@@ -240,7 +257,7 @@ bool QEMUController::loadSnapshot(const std::string& name)
 {
     if (!m_qmpClient)
     {
-        std::cerr << "[QEMUController] loadSnapshot called but QMP is not connected.\n";
+        Logger::error("[QEMUController] loadSnapshot called but QMP is not connected.");
         return false;
     }
     return m_qmpClient->loadSnapshot(name);
@@ -250,7 +267,7 @@ bool QEMUController::queryStatus()
 {
     if (!m_qmpClient)
     {
-        std::cerr << "[QEMUController] queryStatus called but QMP is not connected.\n";
+        Logger::error("[QEMUController] queryStatus called but QMP is not connected.");
         return false;
     }
     return m_qmpClient->queryStatus();
