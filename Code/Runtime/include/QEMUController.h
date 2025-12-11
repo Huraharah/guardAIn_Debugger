@@ -5,13 +5,13 @@
 #include "Logger.h"
 #include "RuntimeConfig.h"
 
-class QEMUController
+class QemuController
 {
 public:
     // Construct from shared runtime configuration
-    explicit QEMUController(const RuntimeConfig& cfg);
+    explicit QemuController(const RuntimeConfig& cfg);
 
-    ~QEMUController();
+    ~QemuController();
 
     // For now, vmName is just for logging.
     bool startVm(const std::string& vmName, bool useSnapshot = true);
@@ -30,6 +30,7 @@ public:
 
 	// Util Getters/Setters
 	void setDiskImagePath(const std::string& path);
+	void setIsRunning(bool isRunning);
     unsigned long getProcessID();
     HANDLE getProcessHandle();
 

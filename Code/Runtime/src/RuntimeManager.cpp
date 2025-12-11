@@ -1,9 +1,14 @@
 ﻿#include "RuntimeManager.h"
 
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <filesystem>
+#include <thread>
+#include <chrono>
 
 namespace fs = std::filesystem;
+using namespace std::chrono_literals;
 
 RuntimeManager::RuntimeManager(RuntimeConfig& cfg)
     : cfg_(cfg),
@@ -123,6 +128,7 @@ bool RuntimeManager::prepareSampleImage(const std::string& sampleName,
         }
         
         Logger::info("[RuntimeManager] Sample image ready: " + outSampleDiskPath);
+		qemu_.setIsRunning(false);
     }
     else {
         Logger::info("[RuntimeManager] Sample disk already exists: " + outSampleDiskPath);
@@ -148,7 +154,20 @@ bool RuntimeManager::runInSnapshotVm(
     }
 
     const bool ok = work(ssh_);
-    qemu_.stopVm();
+    ssh_.runRemote(
+        "sync; sudo sync; sudo shutdown -h now"
+    );
+    Logger::info("[RuntimeManager] Requested guest shutdown.");
+    if (WaitForSingleObject(qemu_.getProcessHandle(), 15000) != 0)  // 15 seconds
+    {
+        Logger::warn("[RuntimeManager] QEMU did not exit within 15s after shutdown; forcing stop.");
+        qemu_.stopVm(); // emergency sledgehammer
+    }
+    else
+    {
+        Logger::info("[RuntimeManager] Guest shutdown complete.");
+        qemu_.setIsRunning(false);
+    }
     return ok;
 }
 
@@ -173,7 +192,7 @@ bool RuntimeManager::runBaselineDiffPass(const std::string& sampleName,
             ssh.runRemote("strings -a -t x /home/" + cfg_.sshUser + "/" + sampleName + " | head -n 2000 > /tmp/" + sampleName + ".strings");
             ssh.runRemote("binwalk /home/" + cfg_.sshUser + "/" + sampleName + " > /tmp/" + sampleName + ".binwalk || true");
             ssh.runRemote("readelf -a /home/" + cfg_.sshUser + "/" + sampleName + " > /tmp/" + sampleName + ".readelf");
-            ssh.runRemote("objdump -d -M intel /home/" + cfg_.sshUser + "/" + sampleName + " | head -n 2000 > /tmp/" + sampleName + ".objdump");
+            ssh.runRemote("objdump -d -M intel /home/" + cfg_.sshUser + "/" + sampleName + " > /tmp/" + sampleName + ".objdump");
 
             // Pre-manifest
             ssh_.runRemote(
@@ -212,6 +231,7 @@ bool RuntimeManager::runBaselineDiffPass(const std::string& sampleName,
 
             Logger::info("[RuntimeManager] Baseline diff artifacts saved under: " + baselineDir + " & Static tool artifacts under: " + staticDir);
 
+			/* This portion moved into runInSnapshotVm() to reduce code duplication - retained for historical reference
             ssh.runRemote(
                 "sync; sudo sync; sudo shutdown -h now"
             );
@@ -221,6 +241,11 @@ bool RuntimeManager::runBaselineDiffPass(const std::string& sampleName,
                 Logger::warn("[RuntimeManager] QEMU did not exit within 15s after shutdown; forcing stop.");
                 qemu_.stopVm(); // emergency sledgehammer
             }
+            else
+            {
+				Logger::info("[RuntimeManager] Guest shutdown complete (static phase).");
+				qemu_.setIsRunning(false);
+            }*/
             return true;
         });
 }
@@ -331,15 +356,20 @@ bool RuntimeManager::runStracePass(const std::string& sampleName,
 
             Logger::info("[RuntimeManager] Debug log saved to: " + debugDir + "\\debug.log");
 
-            ssh.runRemote(
-                "sync; sudo sync; sudo shutdown -h now"
-            );
+			/* This portion moved into runInSnapshotVm() to reduce code duplication - retained for historical reference
+            ssh.runRemote("sync; sudo sync; sudo shutdown -h now");
+
             Logger::info("[RuntimeManager] Requested guest shutdown (early debug phase).");
             if (WaitForSingleObject(qemu_.getProcessHandle(), 15000) != 0)  // 15 seconds
             {
                 Logger::warn("[RuntimeManager] QEMU did not exit within 15s after shutdown; forcing stop.");
                 qemu_.stopVm(); // emergency sledgehammer
             }
+            else
+            {
+				Logger::info("[RuntimeManager] Guest shutdown complete (early debug phase).");
+				qemu_.setIsRunning(false);
+            }*/
             return true;
         });
 }
@@ -375,7 +405,7 @@ bool RuntimeManager::runLtracePass(const std::string& sampleName,
 }
 */
 
-/* Function refactored into the same strace cycle to reduce boot cycles - retained for historical reference
+/* Function refactored into the same strace cycle to reduce boot cycles, with a new guided debug pass under the same method name - retained for historical reference
 bool RuntimeManager::runDebugPass(const std::string& sampleName,
     const std::string& sampleDiskPath,
     const std::string& artifactsRoot)
@@ -412,6 +442,97 @@ bool RuntimeManager::runDebugPass(const std::string& sampleName,
 }
 */
 
+static std::string readFileToString(const std::string& path)
+{
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return {};
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    return ss.str();
+}
+
+bool RuntimeManager::runDebugPass(const std::string& sampleName,
+    const std::string& sampleDiskPath,
+    const std::string& artifactsRoot)
+{
+    const auto debugDir = buildDebugDir(artifactsRoot);
+    ensureDirectories(debugDir);
+
+    Logger::info("[RuntimeManager] Starting debug pass for sample: " + sampleName);
+
+    // 1) Paths on the HOST
+    const std::string planJsonHost = artifactsRoot + "/LLM/plan.json";
+    const std::string gdbScriptHost = debugDir + "/plan.gdb";
+    const std::string gdbErrorScript = debugDir + "/plan_error.gdb";
+
+    // 2) Build GDB script from the LLM JSON plan
+    std::string errorMsg;
+    if (!GdbScriptBuilder::writeScriptToFile(planJsonHost, gdbScriptHost, errorMsg))
+    {
+        Logger::error("[RuntimeManager] Failed to build GDB script from plan: " + errorMsg);
+
+        // Optionally also dump the error script path
+        Logger::error("[RuntimeManager] See " + gdbErrorScript + " for partial script / diagnostics (if written).");
+        return false;
+    }
+
+    // 3) Run this inside a fresh snapshot VM, using the existing helper.
+    return runInSnapshotVm("debug-pass", sampleDiskPath,
+        [&](SshHelper& ssh) -> bool
+        {
+            // 3a) Remote paths
+            const std::string remoteHome = "/home/" + cfg_.sshUser;      // from RuntimeConfig
+            const std::string remoteScript = remoteHome + "/plan.gdb";
+            const std::string remoteSample = remoteHome + "/" + sampleName;
+            const std::string remoteGdbLog = "/tmp/" + sampleName + ".gdb.log";
+            const std::string remoteMemfd = "/tmp/memfd_dump.bin";
+
+            // 3b) Copy the script into the guest
+            if (!ssh.copyTo(gdbScriptHost, remoteScript))
+            {
+                Logger::error("[RuntimeManager] Failed to copy plan.gdb into guest.");
+                return false;
+            }
+
+            // 3c) Build and run the GDB command in the guest.
+            //     We run in batch mode so GDB exits when the script finishes.
+            std::string gdbCmd =
+                "cd " + remoteHome + " && "
+                "gdb -q -batch -x " + remoteScript +
+                " -- " + remoteSample +
+                " > " + remoteGdbLog + " 2>&1";
+
+            Logger::info("[RuntimeManager] Running remote GDB: " + gdbCmd);
+
+            if (!ssh.runRemote(gdbCmd))
+            {
+                Logger::error("[RuntimeManager] Remote GDB command reported failure (ssh runRemote). "
+                    "Will still attempt to collect artifacts.");
+            }
+
+            // 3d) Pull back GDB log
+            const std::string localGdbLog = debugDir + "/" + sampleName + ".gdb.log";
+            if (!ssh.copyFrom(remoteGdbLog, localGdbLog))
+            {
+                Logger::warn("[RuntimeManager] Failed to copy GDB log from guest: " + remoteGdbLog);
+            }
+
+            // 3e) Pull back memfd dump (if any)
+            const std::string localMemfd = debugDir + "/memfd_dump.bin";
+            if (!ssh.copyFrom(remoteMemfd, localMemfd))
+            {
+                Logger::warn("[RuntimeManager] No memfd dump copied (file may not exist): " + remoteMemfd);
+            }
+            else
+            {
+                Logger::info("[RuntimeManager] Retrieved memfd dump: " + localMemfd);
+            }
+
+            // You can add more artifact pulls here later (e.g., /tmp/other_dump.bin)
+            return true;
+        });
+}
+
 bool RuntimeManager::analyzeSample()
 {
 	const std::string samplePath = cfg_.sampleDirectory + cfg_.sampleName;
@@ -428,6 +549,8 @@ bool RuntimeManager::analyzeSample()
         return false;
     }
 
+	std::this_thread::sleep_for(2s); // brief pause
+
     // 1) Baseline diff + static tools
     if (!runBaselineDiffPass(sampleName, sampleDiskPath, artifactsRoot)) {
         Logger::warn("[RuntimeManager] Baseline diff pass failed (continuing)");
@@ -439,6 +562,8 @@ bool RuntimeManager::analyzeSample()
     }
     */
 
+    std::this_thread::sleep_for(2s); // brief pause
+
     // 2) Dynamic tracing
     const int runIndex = 1; // later you can loop this or branch paths
     if (!runStracePass(sampleName, sampleDiskPath, artifactsRoot, runIndex)) {
@@ -449,12 +574,14 @@ bool RuntimeManager::analyzeSample()
     if (!runLtracePass(sampleName, sampleDiskPath, artifactsRoot, runIndex)) {
         Logger::warn("[RuntimeManager] ltrace pass failed (continuing)");
     }
+    */
 
     // 3) Debug snapshot
     if (!runDebugPass(sampleName, sampleDiskPath, artifactsRoot)) {
         Logger::warn("[RuntimeManager] debug pass failed (continuing)");
     }
-    */
+    
+    std::this_thread::sleep_for(2s); // brief pause
 
     // 4) Collate everything into JSON
     const auto summaryDir = (fs::path(artifactsRoot) / "summary").string();

@@ -27,6 +27,18 @@ int main()
     RuntimeManager rm(cfg_);
 	rm.analyzeSample();
 
+	/*std::string errorOut;
+	if (!GdbScriptBuilder::writeScriptToFile(cfg_.artifactsRoot + "/" + cfg_.sampleName + "/LLM/plan.json",
+											 cfg_.artifactsRoot + "/" + cfg_.sampleName + "/debug/plan.gdb",
+											 errorOut))
+	{
+		Logger::error("[GuardAInDBG Runtime] Failed to write GDB script from LLM plan.");
+	}
+	else
+	{
+		Logger::info("[GuardAInDBG Runtime] GDB script successfully written from LLM plan.");
+	}*/
+
     Logger::info("[GuardAInDBG Runtime] Done.");
     return 0;
 }

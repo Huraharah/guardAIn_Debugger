@@ -30,10 +30,10 @@
     <ClInclude Include="Code\Runtime\include\RuntimeManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Code\Runtime\include\LLMInterface.h">
+    <ClInclude Include="Code\Runtime\include\LlmInterface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Code\Runtime\include\QEMUController.h">
+    <ClInclude Include="Code\Runtime\include\QemuController.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Code\Runtime\include\TraceCollector.h">
@@ -51,18 +51,21 @@
     <ClInclude Include="Code\Runtime\include\Logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Code\Runtime\include\GdbScriptBuilder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Code\Runtime\src\RuntimeManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Code\Runtime\src\QEMUController.cpp">
+    <ClCompile Include="Code\Runtime\src\QemuController.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Code\Runtime\src\TraceCollector.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Code\Runtime\src\LLMInterface.cpp">
+    <ClCompile Include="Code\Runtime\src\LlmInterface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Code\Runtime\src\main.cpp">
@@ -75,6 +78,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Code\Runtime\src\Logger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Code\Runtime\src\GdbScriptBuilder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

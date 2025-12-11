@@ -110,33 +110,33 @@ Each milestone is broken down into concrete, checkable tasks.
 - [x] Implement a minimal `TraceCollector` to summarize syscalls.
 ---
 
-#### :white_large_square: Milestone 4 – GDB Remote Controller & Second Run (No LLM Yet)
+#### :white_check_mark: Milestone 4 – GDB Remote Controller & Second Run (No LLM Yet)
 
 **Goal:** Scriptable control of a debugged process inside QEMU via GDB remote protocol.
 
-- [ ] Extend QEMU launch options
-  - [ ] Add `-gdb tcp:localhost:1234 -S` (or `-s -S`) for debug runs
-  - [ ] Ensure VM halts at startup and waits for debugger
-- [ ] Implement `GdbRemoteController`
-  - [ ] Connect to `localhost:1234`
-  - [ ] Implement minimal packet send/receive (RSP – Remote Serial Protocol)
-  - [ ] Implement:
-    - [ ] `getStopReason()`
-    - [ ] `readRegisters()`
-    - [ ] `continueExecution()` (`c`)
-    - [ ] `stepInstruction()` (`s`)
-  - [ ] Implement setting and removing a software breakpoint at a given address (`Z0`/`z0`)
-- [ ] Simple demo flow (hard-coded)
-  - [ ] Restore `baseline_clean`
-  - [ ] Launch QEMU in debug mode
-  - [ ] Set a breakpoint at a known address in a toy program
-  - [ ] Run program, confirm breakpoint hit
-  - [ ] Log registers and resume
-- [ ] Integrate with `RuntimeManager`
-  - [ ] Add `runSecondPassDebug()` that:
-    - [ ] Uses `QemuController` to start in debug mode
-    - [ ] Uses `GdbRemoteController` to apply a hard-coded debug plan
-- [ ] Document basic RSP usage and demo in README
+- [x] Extend QEMU launch options
+  - [x] Add `-gdb tcp:localhost:1234 -S` (or `-s -S`) for debug runs
+  - [x] Ensure VM halts at startup and waits for debugger
+- [x] Implement `GdbRemoteController`
+  - [x] Connect to `localhost:1234`
+  - [x] Implement minimal packet send/receive (RSP – Remote Serial Protocol)
+  - [x] Implement:
+    - [x] `getStopReason()`
+    - [x] `readRegisters()`
+    - [x] `continueExecution()` (`c`)
+    - [x] `stepInstruction()` (`s`)
+  - [x] Implement setting and removing a software breakpoint at a given address (`Z0`/`z0`)
+- [x] Simple demo flow (hard-coded)
+  - [x] Restore `baseline_clean`
+  - [x] Launch QEMU in debug mode
+  - [x] Set a breakpoint at a known address in a toy program
+  - [x] Run program, confirm breakpoint hit
+  - [x] Log registers and resume
+- [x] Integrate with `RuntimeManager`
+  - [x] Add `runSecondPassDebug()` that:
+    - [x] Uses `QemuController` to start in debug mode
+    - [x] Uses `GdbRemoteController` to apply a hard-coded debug plan
+- [x] Document basic RSP usage and demo in README
 
 ---
 
@@ -232,6 +232,11 @@ Each milestone is broken down into concrete, checkable tasks.
 - Additionally, switched from using a Fedora Server image to a minimal Debian cloud image for the QEMU guest - greatly reduced boot time per cycle
     - Further optimized run by refactoring groups of processes together, such as all of the static tools are run in the same instance as the diff, etc. This reduced the number of boot cycles required.
     - Total run time for full analysis at roughly 5 minutes per sample through Milestone 3, down from about 10-15 minutes.
+- During Milestone 4, modified the GDB pipeline to create a GDB script on-the-fly that is passed to GDB at runtime, rather than issuing commands one at a time over the RSP connection.
+    - This greatly simplified the GDBRemoteController implementation, as it no longer needs to handle the full RSP protocol.
+    - Additionally, this allows for easier debugging of the GDB commands themselves, as the script can be inspected directly.
+    - Script generation is currently very basic, but can be expanded in future milestones to support more complex plans from the LLM.
+    - GdbScriptGenerator class builds the script based on a JSON debug plan input - this JSON will be wired up to be created by the LLM based on the earlier artifacts
 
 ---
 ---

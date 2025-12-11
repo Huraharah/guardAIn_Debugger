@@ -1,4 +1,4 @@
-#include "QEMUController.h"
+#include "QemuController.h"
 
 #include <iostream>
 
@@ -8,7 +8,7 @@
 #endif
 
 // Constructor definition must be qualified with the class name
-QEMUController::QEMUController(const RuntimeConfig& cfg)
+QemuController::QemuController(const RuntimeConfig& cfg)
     : cfg_(cfg),
     m_qemuExecutable(cfg.qemuBinary),         // Which QEMU binary to use - full path e.g. "A:\QEMU\qemu-system-x86_64.exe"
     m_baseImagePath(cfg.baseImagePath),       // Full base image path e.g. "A:\VMs\linux_base.qcow2"
@@ -27,7 +27,7 @@ QEMUController::QEMUController(const RuntimeConfig& cfg)
 {
 }
 
-QEMUController::~QEMUController()
+QemuController::~QemuController()
 {
     if (m_isRunning)
     {
@@ -42,23 +42,28 @@ QEMUController::~QEMUController()
     }
 }
 
-void QEMUController::setDiskImagePath(const std::string& path)
+void QemuController::setDiskImagePath(const std::string& path)
 {
     m_diskImagePath = path;
 	Logger::debug("[QEMUController] Disk image path set to : " + m_diskImagePath);
 }
+void QemuController::setIsRunning(bool isRunning)
+{
+    m_isRunning = isRunning;
+	Logger::debug(std::string("[QEMUController] isRunning set to : ") + (isRunning ? "true" : "false"));
+}
 
-unsigned long QEMUController::getProcessID()
+unsigned long QemuController::getProcessID()
 {
 	return m_processId;
 }
 
-HANDLE QEMUController::getProcessHandle()
+HANDLE QemuController::getProcessHandle()
 {
     return static_cast<HANDLE>(m_processHandle);
 }
 
-bool QEMUController::startVm(const std::string& vmName, bool useSnapshot)
+bool QemuController::startVm(const std::string& vmName, bool useSnapshot)
 {
     if (m_isRunning)
     {
@@ -94,7 +99,7 @@ bool QEMUController::startVm(const std::string& vmName, bool useSnapshot)
     return ok;
 }
 
-bool QEMUController::stopVm()
+bool QemuController::stopVm()
 {
     if (!m_isRunning)
     {
@@ -133,6 +138,7 @@ bool QEMUController::stopVm()
         {
             // Wait up to 5 seconds for it to die.
             WaitForSingleObject(m_processHandle, 5000);
+			m_isRunning = false;
         }
     }
 #endif
@@ -142,12 +148,12 @@ bool QEMUController::stopVm()
     return true;
 }
 
-bool QEMUController::isRunning() const
+bool QemuController::isRunning() const
 {
     return m_isRunning;
 }
 
-bool QEMUController::launchProcess(const std::string& arguments)
+bool QemuController::launchProcess(const std::string& arguments)
 {
 #ifdef _WIN32
     // Build command line: "C:\path\qemu-system-x86_64.exe" <args>
@@ -194,7 +200,7 @@ bool QEMUController::launchProcess(const std::string& arguments)
 #endif
 }
 
-void QEMUController::cleanupProcessHandle()
+void QemuController::cleanupProcessHandle()
 {
 #ifdef _WIN32
     if (m_processHandle != nullptr)
@@ -207,7 +213,7 @@ void QEMUController::cleanupProcessHandle()
 }
 
 // QMP-related helpers
-bool QEMUController::connectQmp(const std::string& host, int port)
+bool QemuController::connectQmp(const std::string& host, int port)
 {
     if (!m_isRunning)
     {
@@ -243,7 +249,7 @@ bool QEMUController::connectQmp(const std::string& host, int port)
     return true;
 }
 
-bool QEMUController::createSnapshot(const std::string& name)
+bool QemuController::createSnapshot(const std::string& name)
 {
     if (!m_qmpClient)
     {
@@ -253,7 +259,7 @@ bool QEMUController::createSnapshot(const std::string& name)
     return m_qmpClient->saveSnapshot(name);
 }
 
-bool QEMUController::loadSnapshot(const std::string& name)
+bool QemuController::loadSnapshot(const std::string& name)
 {
     if (!m_qmpClient)
     {
@@ -263,7 +269,7 @@ bool QEMUController::loadSnapshot(const std::string& name)
     return m_qmpClient->loadSnapshot(name);
 }
 
-bool QEMUController::queryStatus()
+bool QemuController::queryStatus()
 {
     if (!m_qmpClient)
     {

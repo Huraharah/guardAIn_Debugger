@@ -5,10 +5,12 @@
 #include <memory>
 #include "RuntimeConfig.h"
 #include "Logger.h"
-#include "QEMUController.h"
+#include "QemuController.h"
 #include "SshHelper.h"
 #include "DebugController.h"
 #include "TraceCollector.h"
+#include "GdbScriptBuilder.h"
+#include "DebugPlan.h"
 
 class RuntimeManager {
 public:
@@ -19,7 +21,7 @@ public:
 
 private:
     RuntimeConfig cfg_;
-	QEMUController qemu_;
+	QemuController qemu_;
 	SshHelper ssh_;
 	TraceCollector trace_;
 

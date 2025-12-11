@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -105,7 +105,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>A:\guardAInDBG\Code\Runtime\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)\external;A:\guardAInDBG\Code\Runtime\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -128,9 +128,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Code\Runtime\include\LLMInterface.h" />
+    <ClInclude Include="Code\Runtime\include\GdbScriptBuilder.h" />
+    <ClInclude Include="Code\Runtime\include\LlmInterface.h" />
     <ClInclude Include="Code\Runtime\include\Logger.h" />
-    <ClInclude Include="Code\Runtime\include\QEMUController.h" />
+    <ClInclude Include="Code\Runtime\include\QemuController.h" />
     <ClInclude Include="Code\Runtime\include\QmpClient.h" />
     <ClInclude Include="Code\Runtime\include\RuntimeConfig.h" />
     <ClInclude Include="Code\Runtime\include\RuntimeManager.h" />
@@ -142,10 +143,11 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Code\Runtime\src\LLMInterface.cpp" />
+    <ClCompile Include="Code\Runtime\src\GdbScriptBuilder.cpp" />
+    <ClCompile Include="Code\Runtime\src\LlmInterface.cpp" />
     <ClCompile Include="Code\Runtime\src\Logger.cpp" />
     <ClCompile Include="Code\Runtime\src\main.cpp" />
-    <ClCompile Include="Code\Runtime\src\QEMUController.cpp" />
+    <ClCompile Include="Code\Runtime\src\QemuController.cpp" />
     <ClCompile Include="Code\Runtime\src\QmpClient.cpp" />
     <ClCompile Include="Code\Runtime\src\RuntimeManager.cpp" />
     <ClCompile Include="Code\Runtime\src\SshHelper.cpp" />
