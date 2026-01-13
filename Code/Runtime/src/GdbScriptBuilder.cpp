@@ -4,6 +4,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <algorithm>
+#include <cctype>
 
 #include <nlohmann/json.hpp>
 
@@ -168,6 +169,106 @@ bool GdbScriptBuilder::loadPlanFromJsonFile(const std::string& jsonPath,
                     }
                     action.command = actJson["command"].get<std::string>();
                 }
+                else if (typeStr == "temp_breakpoint")
+                {
+                    action.type = BreakpointAction::Type::TempBreakpoint;
+                    
+                    // Required: offset for the temporary breakpoint
+                    if (!actJson.contains("offset"))
+                    {
+                        errorOut = "temp_breakpoint action requires 'offset' field.";
+                        return false;
+                    }
+                    
+                    std::uint64_t tempOffset = 0;
+                    if (actJson["offset"].is_string())
+                    {
+                        const std::string offStr = actJson["offset"].get<std::string>();
+                        if (!parseHexOrDecUint64(offStr, tempOffset))
+                        {
+                            errorOut = "Failed to parse temp_breakpoint offset: '" + offStr + "'";
+                            return false;
+                        }
+                    }
+                    else if (actJson["offset"].is_number_unsigned())
+                    {
+                        tempOffset = actJson["offset"].get<std::uint64_t>();
+                    }
+                    else
+                    {
+                        errorOut = "temp_breakpoint 'offset' must be a string or unsigned integer.";
+                        return false;
+                    }
+                    
+                    action.tempBreakpointOffset = tempOffset;
+                    action.tempBreakpointNote = actJson.value("note", std::string());
+                    action.tempBreakpointDeleteAfterHit = actJson.value("deleteAfterHit", true);
+                    
+                    // Optional: actions for the temp breakpoint
+                    if (actJson.contains("actions") && actJson["actions"].is_array())
+                    {
+                        for (const auto& tempActJson : actJson["actions"])
+                        {
+                            if (!tempActJson.contains("type") || !tempActJson["type"].is_string())
+                            {
+                                errorOut = "Temp breakpoint action missing required string field 'type'.";
+                                return false;
+                            }
+                            
+                            const std::string tempTypeStr = tempActJson["type"].get<std::string>();
+                            BreakpointAction tempAction;
+                            
+                            if (tempTypeStr == "snapshot")
+                            {
+                                tempAction.type = BreakpointAction::Type::Snapshot;
+                                tempAction.label = tempActJson.value("label", std::string());
+                            }
+                            else if (tempTypeStr == "set_reg")
+                            {
+                                tempAction.type = BreakpointAction::Type::SetRegister;
+                                if (!tempActJson.contains("reg") || !tempActJson["reg"].is_string())
+                                {
+                                    errorOut = "Temp breakpoint set_reg action requires string field 'reg'.";
+                                    return false;
+                                }
+                                if (!tempActJson.contains("value") || !tempActJson["value"].is_string())
+                                {
+                                    errorOut = "Temp breakpoint set_reg action requires string field 'value'.";
+                                    return false;
+                                }
+                                tempAction.reg = tempActJson["reg"].get<std::string>();
+                                tempAction.valueExpr = tempActJson["value"].get<std::string>();
+                            }
+                            else if (tempTypeStr == "gdb_cmd")
+                            {
+                                tempAction.type = BreakpointAction::Type::GdbCommand;
+                                if (!tempActJson.contains("command") || !tempActJson["command"].is_string())
+                                {
+                                    errorOut = "Temp breakpoint gdb_cmd action requires string field 'command'.";
+                                    return false;
+                                }
+                                tempAction.command = tempActJson["command"].get<std::string>();
+                            }
+                            else if (tempTypeStr == "shell")
+                            {
+                                tempAction.type = BreakpointAction::Type::ShellCommand;
+                                if (!tempActJson.contains("command") || !tempActJson["command"].is_string())
+                                {
+                                    errorOut = "Temp breakpoint shell action requires string field 'command'.";
+                                    return false;
+                                }
+                                tempAction.command = tempActJson["command"].get<std::string>();
+                            }
+                            else
+                            {
+                                errorOut = "Unknown temp breakpoint action type: '" + tempTypeStr + "'";
+                                return false;
+                            }
+                            
+                            action.tempBreakpointActions.push_back(std::move(tempAction));
+                        }
+                    }
+                }
                 else
                 {
                     errorOut = "Unknown action type: '" + typeStr + "'";
@@ -268,15 +369,35 @@ std::string GdbScriptBuilder::buildScript(const Plan& plan)
             }
 
             case BreakpointAction::Type::SetRegister:
-                ss << "  echo [guardAIn] set $" << act.reg
+            {
+                // Normalize register name to lowercase (GDB requires lowercase register names)
+                std::string regLower = act.reg;
+                std::transform(regLower.begin(), regLower.end(), regLower.begin(), ::tolower);
+                ss << "  echo [guardAIn] set $" << regLower
                     << " = " << act.valueExpr << "\\n\n";
-                ss << "  set $" << act.reg << " = " << act.valueExpr << "\n";
+                ss << "  set $" << regLower << " = " << act.valueExpr << "\n";
                 break;
+            }
 
             case BreakpointAction::Type::GdbCommand:
+            {
                 ss << "  echo [guardAIn] gdb_cmd: " << act.command << "\\n\n";
-                ss << "  " << act.command << "\n";
+                // Split commands on semicolons and execute each separately
+                // GDB doesn't support semicolons in command blocks
+                std::istringstream cmdStream(act.command);
+                std::string singleCmd;
+                while (std::getline(cmdStream, singleCmd, ';'))
+                {
+                    // Trim whitespace
+                    singleCmd.erase(0, singleCmd.find_first_not_of(" \t"));
+                    singleCmd.erase(singleCmd.find_last_not_of(" \t") + 1);
+                    if (!singleCmd.empty())
+                    {
+                        ss << "  " << singleCmd << "\n";
+                    }
+                }
                 break;
+            }
 
             case BreakpointAction::Type::ShellCommand:
             {
@@ -297,6 +418,109 @@ std::string GdbScriptBuilder::buildScript(const Plan& plan)
                 ss << "    cmd = cmd.replace('$base', hex(base))\n";
                 ss << "os.system(cmd)\n";
                 ss << "end\n";
+                break;
+            }
+
+            case BreakpointAction::Type::TempBreakpoint:
+            {
+                // Create a temporary breakpoint at the specified offset
+                ss << "  echo [guardAIn] creating temp breakpoint at offset " 
+                   << toHexOffset(act.tempBreakpointOffset);
+                if (!act.tempBreakpointNote.empty())
+                    ss << " - " << act.tempBreakpointNote;
+                ss << "\\n\n";
+                
+                // Use tbreak (temporary breakpoint) - auto-deletes after first hit
+                // We'll create it with commands inline
+                ss << "  tbreak *($base + " << toHexOffset(act.tempBreakpointOffset) << ")\n";
+                ss << "  commands\n";
+                ss << "    silent\n";
+                ss << "    echo [guardAIn] temp breakpoint hit at offset " 
+                   << toHexOffset(act.tempBreakpointOffset);
+                if (!act.tempBreakpointNote.empty())
+                    ss << " - " << act.tempBreakpointNote;
+                ss << "\\n\n";
+                
+                // Execute actions for the temp breakpoint
+                for (const auto& tempAct : act.tempBreakpointActions)
+                {
+                    switch (tempAct.type)
+                    {
+                    case BreakpointAction::Type::Snapshot:
+                    {
+                        std::string label = tempAct.label;
+                        if (label.empty())
+                            label = "temp_bp_" + toHexOffset(act.tempBreakpointOffset);
+                        
+                        ss << "    echo [guardAIn] snapshot '" << label << "'\\n\n";
+                        ss << "    info registers\n";
+                        ss << "    x/16i $pc-16\n";
+                        ss << "    x/16gx $rsp\n";
+                        break;
+                    }
+                    
+                    case BreakpointAction::Type::SetRegister:
+                    {
+                        // Normalize register name to lowercase (GDB requires lowercase register names)
+                        std::string regLower = tempAct.reg;
+                        std::transform(regLower.begin(), regLower.end(), regLower.begin(), ::tolower);
+                        ss << "    echo [guardAIn] set $" << regLower
+                           << " = " << tempAct.valueExpr << "\\n\n";
+                        ss << "    set $" << regLower << " = " << tempAct.valueExpr << "\n";
+                        break;
+                    }
+                    
+                    case BreakpointAction::Type::GdbCommand:
+                    {
+                        ss << "    echo [guardAIn] gdb_cmd: " << tempAct.command << "\\n\n";
+                        // Split commands on semicolons and execute each separately
+                        // GDB doesn't support semicolons in command blocks
+                        std::istringstream cmdStream(tempAct.command);
+                        std::string singleCmd;
+                        while (std::getline(cmdStream, singleCmd, ';'))
+                        {
+                            // Trim whitespace
+                            singleCmd.erase(0, singleCmd.find_first_not_of(" \t"));
+                            singleCmd.erase(singleCmd.find_last_not_of(" \t") + 1);
+                            if (!singleCmd.empty())
+                            {
+                                ss << "    " << singleCmd << "\n";
+                            }
+                        }
+                        break;
+                    }
+                    
+                    case BreakpointAction::Type::ShellCommand:
+                    {
+                        ss << "    echo [guardAIn] shell: " << tempAct.command << "\\n\n";
+                        const std::string escapedCmd = escapeForSingleQuotedPython(tempAct.command);
+                        ss << "    python\n";
+                        ss << "import gdb, os\n";
+                        ss << "pid = gdb.selected_inferior().pid\n";
+                        ss << "try:\n";
+                        ss << "    base = int(gdb.parse_and_eval('$base'))\n";
+                        ss << "except Exception:\n";
+                        ss << "    base = None\n";
+                        ss << "cmd = '" << escapedCmd << "'\n";
+                        ss << "cmd = cmd.replace('$pid', str(pid))\n";
+                        ss << "if base is not None:\n";
+                        ss << "    cmd = cmd.replace('$base', hex(base))\n";
+                        ss << "os.system(cmd)\n";
+                        ss << "end\n";
+                        break;
+                    }
+                    
+                    case BreakpointAction::Type::TempBreakpoint:
+                        // Nested temp breakpoints not supported
+                        ss << "    echo [guardAIn] WARNING: Nested temp breakpoints not supported\\n\n";
+                        break;
+                    }
+                }
+                
+                // After temp breakpoint actions, continue execution
+                // Note: tbreak automatically deletes itself after first hit, so we don't need to delete it
+                ss << "    continue\n";
+                ss << "  end\n";
                 break;
             }
             } // end switch

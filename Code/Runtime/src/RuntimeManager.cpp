@@ -576,6 +576,18 @@ bool RuntimeManager::analyzeSample()
     }
     */
 
+    std::this_thread::sleep_for(2s); // brief pause
+
+    // 2.5) Generate LLM debug plan from static analysis
+    const std::string targetPath = "/home/" + cfg_.sshUser + "/" + sampleName;
+    std::string llmError;
+    if (!LlmInterface::generateDebugPlan(artifactsRoot, sampleName, targetPath, llmError)) {
+        Logger::error("[RuntimeManager] Failed to generate LLM debug plan: " + llmError);
+        Logger::warn("[RuntimeManager] Continuing without LLM-generated plan (debug pass may fail)");
+    } else {
+        Logger::info("[RuntimeManager] LLM debug plan generated successfully");
+    }
+
     // 3) Debug snapshot
     if (!runDebugPass(sampleName, sampleDiskPath, artifactsRoot)) {
         Logger::warn("[RuntimeManager] debug pass failed (continuing)");
