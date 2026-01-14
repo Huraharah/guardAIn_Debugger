@@ -11,12 +11,13 @@
 #include "TraceCollector.h"
 #include "GdbScriptBuilder.h"
 #include "DebugPlan.h"
+#include "LlmInterface.h"
 
 class RuntimeManager {
 public:
     explicit RuntimeManager(RuntimeConfig& cfg);
 
-    // High-level “do everything” call:
+    // High-level ï¿½do everythingï¿½ call:
     bool analyzeSample();
 
 private:

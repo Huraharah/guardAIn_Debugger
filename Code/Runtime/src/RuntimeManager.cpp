@@ -132,6 +132,21 @@ bool RuntimeManager::prepareSampleImage(const std::string& sampleName,
     }
     else {
         Logger::info("[RuntimeManager] Sample disk already exists: " + outSampleDiskPath);
+        // #region agent log
+        // Log that we're skipping prepare phase when disk exists
+        Logger::debug("[RuntimeManager] Skipping prepare phase - disk exists. Sample may already be in VM.");
+        // #endregion agent log
+        
+        // CRITICAL: Even when skipping prepare, we must set the disk image path
+        // Otherwise QEMU will start with an empty file= parameter
+        qemu_.setDiskImagePath(outSampleDiskPath);
+        
+        // If disk exists but was from an interrupted run, the VM might be in a bad state
+        // We have two options:
+        // 1. Always recreate the disk (safest but slower)
+        // 2. Verify sample exists in VM before proceeding (faster but requires a boot)
+        // For now, we'll proceed and let subsequent phases handle it
+        // If SSH fails, it's likely because the disk is in a bad state from a previous interrupted run
     }
 
     return true;
@@ -142,13 +157,31 @@ bool RuntimeManager::runInSnapshotVm(
     const std::string& sampleDiskPath,
     const std::function<bool(SshHelper&)>& work)
 {
+    // #region agent log
+    // Log VM start attempt
+    Logger::debug("[RuntimeManager] runInSnapshotVm: Starting VM '" + vmName + "' with disk '" + sampleDiskPath + "'");
+    // #endregion agent log
+    
+    // CRITICAL: Set the disk image path before starting VM
+    // This ensures QEMU uses the correct disk even when prepare phase was skipped
+    qemu_.setDiskImagePath(sampleDiskPath);
+    
     if (!qemu_.startVm(vmName, true)) {
         Logger::error("[RuntimeManager] Failed to start VM for " + vmName);
         return false;
     }
 
+    // #region agent log
+    // Log SSH wait attempt
+    Logger::debug("[RuntimeManager] runInSnapshotVm: Waiting for SSH to be ready (timeout: " + std::to_string(cfg_.sshTimeoutSec) + "s)");
+    // #endregion agent log
+    
     if (!ssh_.waitForReady(cfg_.sshTimeoutSec)) {
         Logger::error("[RuntimeManager] SSH not ready for " + vmName);
+        // #region agent log
+        // Log SSH failure - this might indicate disk is in bad state
+        Logger::error("[RuntimeManager] SSH connection refused - possible causes: disk in bad state from interrupted run, VM not fully booted, or SSH service not started");
+        // #endregion agent log
         qemu_.stopVm();
         return false;
     }
@@ -575,6 +608,18 @@ bool RuntimeManager::analyzeSample()
         Logger::warn("[RuntimeManager] ltrace pass failed (continuing)");
     }
     */
+
+    std::this_thread::sleep_for(2s); // brief pause
+
+    // 2.5) Generate LLM debug plan from static analysis
+    const std::string targetPath = "/home/" + cfg_.sshUser + "/" + sampleName;
+    std::string llmError;
+    if (!LlmInterface::generateDebugPlan(artifactsRoot, sampleName, targetPath, llmError)) {
+        Logger::error("[RuntimeManager] Failed to generate LLM debug plan: " + llmError);
+        Logger::warn("[RuntimeManager] Continuing without LLM-generated plan (debug pass may fail)");
+    } else {
+        Logger::info("[RuntimeManager] LLM debug plan generated successfully");
+    }
 
     // 3) Debug snapshot
     if (!runDebugPass(sampleName, sampleDiskPath, artifactsRoot)) {

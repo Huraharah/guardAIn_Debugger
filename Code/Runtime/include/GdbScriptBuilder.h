@@ -14,7 +14,8 @@ public:
             Snapshot,
             SetRegister,
             GdbCommand,
-            ShellCommand
+            ShellCommand,
+            TempBreakpoint
         };
 
         Type        type = Type::Snapshot;
@@ -22,6 +23,12 @@ public:
         std::string reg;         // for SetRegister
         std::string valueExpr;   // for SetRegister (e.g. "0xffffffff")
         std::string command;     // for GdbCommand / ShellCommand
+        
+        // For TempBreakpoint:
+        std::uint64_t tempBreakpointOffset = 0;  // Offset for the temporary breakpoint
+        std::string tempBreakpointNote;          // Note/description for the temp breakpoint
+        std::vector<BreakpointAction> tempBreakpointActions;  // Actions to execute when temp breakpoint hits
+        bool tempBreakpointDeleteAfterHit = true;  // Whether to delete the temp breakpoint after it's hit
     };
 
     struct BreakpointSpec

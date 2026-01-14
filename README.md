@@ -140,30 +140,30 @@ Each milestone is broken down into concrete, checkable tasks.
 
 ---
 
-#### :white_large_square: Milestone 5 – LLM Interface & Debug Plan Schema
+#### :bangbang: Milestone 5 – LLM Interface & Debug Plan Schema
 
 **Goal:** Let the LLM propose a structured “debug plan” based on first-run traces.
 
-- [ ] Define a JSON schema for an LLM “debug plan”
-  - [ ] Breakpoints (addresses, reasons)
-  - [ ] Patches (address + bytes or semantic action)
-  - [ ] Snapshot triggers (when/where to snapshot)
-  - [ ] Branch exploration hints (“explore alternative path at location X”)
-- [ ] Implement `LlmInterface`
-  - [ ] Define `DebugPlan LlmInterface::generateDebugPlan(const TraceSummary& summary, /* static info later */)`
-  - [ ] For now, stub in a fake implementation that returns a hard-coded plan
-  - [ ] Later, connect to actual LLM API/tooling
-- [ ] RuntimeManager integration
-  - [ ] Add `runTwoPhaseAnalysis(const std::string& samplePath)`:
-    - [ ] Call `runFirstPass()` → get `TraceSummary`
-    - [ ] Call `LlmInterface::generateDebugPlan()` → get `DebugPlan`
-    - [ ] Call `runSecondPassDebug(DebugPlan)` to apply it via `GdbRemoteController`
-- [ ] Logging
-  - [ ] Log plan + results (which breakpoints hit, which patches applied)
-  - [ ] Store under `artifacts/<sample_name>/run2/`
-- [ ] Update README with:
-  - [ ] Description of the LLM role
-  - [ ] Example debug plan JSON
+- [x] Define a JSON schema for an LLM “debug plan”
+  - [x] Breakpoints (addresses, reasons)
+  - :exclamation: Patches (address + bytes or semantic action)
+  - [x] Snapshot triggers (when/where to snapshot)
+  - [x] Branch exploration hints (“explore alternative path at location X”)
+- [x] Implement `LlmInterface`
+  - [x] Define `DebugPlan LlmInterface::generateDebugPlan(const TraceSummary& summary, /* static info later */)`
+  - [x] For now, stub in a fake implementation that returns a hard-coded plan
+  - [x] Later, connect to actual LLM API/tooling
+- [x] RuntimeManager integration
+  - [x] Add `runTwoPhaseAnalysis(const std::string& samplePath)`:
+    - [x] Call `runFirstPass()` → get `TraceSummary`
+    - [x] Call `LlmInterface::generateDebugPlan()` → get `DebugPlan`
+    - [x] Call `runSecondPassDebug(DebugPlan)` to apply it via `GdbRemoteController`
+- [x] Logging
+  - [x] Log plan + results (which breakpoints hit, which patches applied)
+  - [x] Store under `artifacts/<sample_name>/run2/`
+- [x] Update README with:
+  - [x] Description of the LLM role
+  - [x] Example debug plan JSON
 
 ---
 
@@ -222,23 +222,38 @@ Each milestone is broken down into concrete, checkable tasks.
  
 ---
 
+#### :white_large_square: Milestone 5
+
+- [ ] Additional fields/interupt types for DebugPlan schema JSON
+    - [ ] Memory read/write commands
+    - [ ] Byte patching commands
+    - [ ] Anti-disassembly / obfuscation handling commands
+    - [ ] Encryption/decryption handling commands
+
 ### Development Notes
 
 - Snapshot commands failed in minimal test environment; need to verify QEMU build has snapshot support, and how to invoke them correctly.
     - Problem fixed by using qcow2 images and proper QEMU options ('-snapshot', creating per-sample image files). 
-
+---
 - During Milestone 3, decided to work a major refactor of "RuntimeManager" to allow for a single orchestration function that can be called
  in CLI with most of the info to configure the run passed in as parameters. This should simplify the UI portion significantly.
 - Additionally, switched from using a Fedora Server image to a minimal Debian cloud image for the QEMU guest - greatly reduced boot time per cycle
     - Further optimized run by refactoring groups of processes together, such as all of the static tools are run in the same instance as the diff, etc. This reduced the number of boot cycles required.
     - Total run time for full analysis at roughly 5 minutes per sample through Milestone 3, down from about 10-15 minutes.
-- During Milestone 4, modified the GDB pipeline to create a GDB script on-the-fly that is passed to GDB at runtime, rather than issuing commands one at a time over the RSP connection.
+---
+-  During Milestone 4, modified the GDB pipeline to create a GDB script on-the-fly that is passed to GDB at runtime, rather than issuing commands one at a time over the RSP connection.
     - This greatly simplified the GDBRemoteController implementation, as it no longer needs to handle the full RSP protocol.
     - Additionally, this allows for easier debugging of the GDB commands themselves, as the script can be inspected directly.
     - Script generation is currently very basic, but can be expanded in future milestones to support more complex plans from the LLM.
     - GdbScriptGenerator class builds the script based on a JSON debug plan input - this JSON will be wired up to be created by the LLM based on the earlier artifacts
 
 ---
+- During Milestone 5, created a basic LLM interface that currently stubs out a hard-coded debug plan.
+    - The DebugPlan schema was defined in JSON, with fields for breakpoints, patches, and snapshot triggers.
+    - Updated RuntimeManager to include a two-phase analysis function that ties together the first pass trace collection
+    - Major portion of Milestone 5 was spent fine-tuning the prompt for the LLM to generate the correct JSON plan, while maintaining enough generalization to work for other samples, rather than overfitting to the test sample used.
+    - Future work will involve refining the prompt and possibly adding more context to improve plan quality, including adding additional patern recognitions for various other evasion, obfuscation, anti-RE (debug and/or disassembly), and encryption
+    - Also fixed a long-standing issue with running a sample that has an image already - the code to set the image file for the run was embedded in the prepare section, so it was never hit if the image already exists
 ---
 
 ## Core
