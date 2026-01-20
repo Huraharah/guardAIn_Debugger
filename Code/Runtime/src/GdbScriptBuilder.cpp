@@ -4,7 +4,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <algorithm>
-#include <cctype>
 
 #include <nlohmann/json.hpp>
 
@@ -312,6 +311,7 @@ std::string GdbScriptBuilder::buildScript(const Plan& plan)
     ss << "def _guardain_init(target_basename):\n";
     ss << "    out = gdb.execute('info proc mappings', to_string=True)\n";
     ss << "    base = None\n";
+    ss << "    load_addr = None\n";
     ss << "    for line in out.splitlines():\n";
     ss << "        # Example line:\n";
     ss << "        # 0x0000555555554000 0x0000555555556000 ... r--p  /home/analyst/suspicious\n";
@@ -322,12 +322,22 @@ std::string GdbScriptBuilder::buildScript(const Plan& plan)
     ss << "        path  = parts[-1]\n";
     ss << "        if 'r--' in perms and ('/' + target_basename) in path:\n";
     ss << "            try:\n";
-    ss << "                base = int(parts[0], 16)\n";
+    ss << "                load_addr = int(parts[0], 16)\n";
     ss << "            except Exception:\n";
     ss << "                continue\n";
     ss << "            break\n";
-    ss << "    if base is None:\n";
+    ss << "    if load_addr is None:\n";
     ss << "        raise gdb.GdbError('guardAIn: failed to locate base mapping for ' + target_basename)\n";
+    ss << "    # For PIE binaries, load_addr will be randomized (e.g., 0x555555554000)\n";
+    ss << "    # For non-PIE EXEC binaries, load_addr will be fixed (e.g., 0x400000)\n";
+    ss << "    # If load_addr is in the typical PIE range (0x55* or 0x7f*), it's PIE\n";
+    ss << "    # If load_addr is low (< 0x800000), it's likely non-PIE, set base=0\n";
+    ss << "    if load_addr < 0x800000:\n";
+    ss << "        # Non-PIE binary: addresses in JSON are absolute, set base=0\n";
+    ss << "        base = 0\n";
+    ss << "    else:\n";
+    ss << "        # PIE binary: addresses in JSON are offsets from load address\n";
+    ss << "        base = load_addr\n";
     ss << "    gdb.execute('set $base = 0x%x' % base)\n";
     ss << "    pid = gdb.selected_inferior().pid\n";
     ss << "    gdb.execute('set $pid = %d' % pid)\n";
@@ -369,107 +379,15 @@ std::string GdbScriptBuilder::buildScript(const Plan& plan)
             }
 
             case BreakpointAction::Type::SetRegister:
-            {
-                // Normalize register name to lowercase (GDB requires lowercase register names)
-                std::string regLower = act.reg;
-                std::transform(regLower.begin(), regLower.end(), regLower.begin(), ::tolower);
-                ss << "  echo [guardAIn] set $" << regLower
+                ss << "  echo [guardAIn] set $" << act.reg
                     << " = " << act.valueExpr << "\\n\n";
-                ss << "  set $" << regLower << " = " << act.valueExpr << "\n";
+                ss << "  set $" << act.reg << " = " << act.valueExpr << "\n";
                 break;
-            }
 
             case BreakpointAction::Type::GdbCommand:
-            {
                 ss << "  echo [guardAIn] gdb_cmd: " << act.command << "\\n\n";
-                // Split commands on semicolons and execute each separately
-                // GDB doesn't support semicolons in command blocks
-                std::istringstream cmdStream(act.command);
-                std::string singleCmd;
-                std::vector<std::string> tbreakCommands;
-                while (std::getline(cmdStream, singleCmd, ';'))
-                {
-                    // Trim whitespace
-                    singleCmd.erase(0, singleCmd.find_first_not_of(" \t"));
-                    singleCmd.erase(singleCmd.find_last_not_of(" \t") + 1);
-                    if (!singleCmd.empty())
-                    {
-                        // Detect and fix breakpoint commands with absolute addresses (not using $base)
-                        std::string cmdLower = singleCmd;
-                        std::transform(cmdLower.begin(), cmdLower.end(), cmdLower.begin(), ::tolower);
-                        bool isTbreak = (cmdLower.find("tbreak") != std::string::npos);
-                        
-                        if (singleCmd.find("break") != std::string::npos || 
-                            isTbreak ||
-                            singleCmd.find("hbreak") != std::string::npos)
-                        {
-                            // Check if it's using an absolute hex address (0xXXXX) without $base
-                            size_t breakPos = cmdLower.find("break");
-                            if (breakPos != std::string::npos)
-                            {
-                                size_t addrStart = singleCmd.find("0x", breakPos);
-                                if (addrStart != std::string::npos)
-                                {
-                                    // Check if $base is NOT in the command
-                                    if (singleCmd.find("$base") == std::string::npos)
-                                    {
-                                        // Fix: replace absolute address with $base + offset
-                                        // Extract the address (e.g., "0x3670" from "break *0x3670")
-                                        size_t addrEnd = addrStart + 2; // Skip "0x"
-                                        while (addrEnd < singleCmd.length() && 
-                                               ((singleCmd[addrEnd] >= '0' && singleCmd[addrEnd] <= '9') ||
-                                                (singleCmd[addrEnd] >= 'a' && singleCmd[addrEnd] <= 'f') ||
-                                                (singleCmd[addrEnd] >= 'A' && singleCmd[addrEnd] <= 'F')))
-                                        {
-                                            addrEnd++;
-                                        }
-                                        std::string addrStr = singleCmd.substr(addrStart, addrEnd - addrStart);
-                                        
-                                        // Replace the absolute address with $base + offset
-                                        // e.g., "break *0x3670" -> "break *($base + 0x3670)"
-                                        size_t starPos = singleCmd.find('*', breakPos);
-                                        if (starPos != std::string::npos && starPos < addrStart)
-                                        {
-                                            std::string beforeAddr = singleCmd.substr(0, addrStart);
-                                            std::string afterAddr = singleCmd.substr(addrEnd);
-                                            singleCmd = beforeAddr + "($base + " + addrStr + ")" + afterAddr;
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            // #region agent log
-                            // If this is a tbreak created via gdb_cmd, we need to give it a commands block
-                            // Otherwise it will stop execution when hit
-                            if (isTbreak)
-                            {
-                                // Store the tbreak command to create with commands block
-                                tbreakCommands.push_back(singleCmd);
-                                // Don't output it yet - we'll output it with a commands block
-                                continue;
-                            }
-                            // #endregion agent log
-                        }
-                        
-                        ss << "  " << singleCmd << "\n";
-                    }
-                }
-                
-                // #region agent log
-                // For any tbreaks created via gdb_cmd, create them with a commands block that continues
-                // This ensures they don't stop execution when hit
-                for (const auto& tbreakCmd : tbreakCommands)
-                {
-                    ss << "  " << tbreakCmd << "\n";
-                    ss << "  commands\n";
-                    ss << "    silent\n";
-                    ss << "    continue\n";
-                    ss << "  end\n";
-                }
-                // #endregion agent log
-                
+                ss << "  " << act.command << "\n";
                 break;
-            }
 
             case BreakpointAction::Type::ShellCommand:
             {
@@ -532,78 +450,15 @@ std::string GdbScriptBuilder::buildScript(const Plan& plan)
                     }
                     
                     case BreakpointAction::Type::SetRegister:
-                    {
-                        // Normalize register name to lowercase (GDB requires lowercase register names)
-                        std::string regLower = tempAct.reg;
-                        std::transform(regLower.begin(), regLower.end(), regLower.begin(), ::tolower);
-                        ss << "    echo [guardAIn] set $" << regLower
+                        ss << "    echo [guardAIn] set $" << tempAct.reg
                            << " = " << tempAct.valueExpr << "\\n\n";
-                        ss << "    set $" << regLower << " = " << tempAct.valueExpr << "\n";
+                        ss << "    set $" << tempAct.reg << " = " << tempAct.valueExpr << "\n";
                         break;
-                    }
                     
                     case BreakpointAction::Type::GdbCommand:
-                    {
                         ss << "    echo [guardAIn] gdb_cmd: " << tempAct.command << "\\n\n";
-                        // Split commands on semicolons and execute each separately
-                        // GDB doesn't support semicolons in command blocks
-                        std::istringstream cmdStream(tempAct.command);
-                        std::string singleCmd;
-                        while (std::getline(cmdStream, singleCmd, ';'))
-                        {
-                            // Trim whitespace
-                            singleCmd.erase(0, singleCmd.find_first_not_of(" \t"));
-                            singleCmd.erase(singleCmd.find_last_not_of(" \t") + 1);
-                            if (!singleCmd.empty())
-                            {
-                                // Detect and fix breakpoint commands with absolute addresses (not using $base)
-                                if (singleCmd.find("break") != std::string::npos || 
-                                    singleCmd.find("tbreak") != std::string::npos ||
-                                    singleCmd.find("hbreak") != std::string::npos)
-                                {
-                                    // Check if it's using an absolute hex address (0xXXXX) without $base
-                                    std::string cmdLower = singleCmd;
-                                    std::transform(cmdLower.begin(), cmdLower.end(), cmdLower.begin(), ::tolower);
-                                    size_t breakPos = cmdLower.find("break");
-                                    if (breakPos != std::string::npos)
-                                    {
-                                        size_t addrStart = singleCmd.find("0x", breakPos);
-                                        if (addrStart != std::string::npos)
-                                        {
-                                            // Check if $base is NOT in the command
-                                            if (singleCmd.find("$base") == std::string::npos)
-                                            {
-                                                // Fix: replace absolute address with $base + offset
-                                                // Extract the address (e.g., "0x3670" from "break *0x3670")
-                                                size_t addrEnd = addrStart + 2; // Skip "0x"
-                                                while (addrEnd < singleCmd.length() && 
-                                                       ((singleCmd[addrEnd] >= '0' && singleCmd[addrEnd] <= '9') ||
-                                                        (singleCmd[addrEnd] >= 'a' && singleCmd[addrEnd] <= 'f') ||
-                                                        (singleCmd[addrEnd] >= 'A' && singleCmd[addrEnd] <= 'F')))
-                                                {
-                                                    addrEnd++;
-                                                }
-                                                std::string addrStr = singleCmd.substr(addrStart, addrEnd - addrStart);
-                                                
-                                                // Replace the absolute address with $base + offset
-                                                // e.g., "break *0x3670" -> "break *($base + 0x3670)"
-                                                size_t starPos = singleCmd.find('*', breakPos);
-                                                if (starPos != std::string::npos && starPos < addrStart)
-                                                {
-                                                    std::string beforeAddr = singleCmd.substr(0, addrStart);
-                                                    std::string afterAddr = singleCmd.substr(addrEnd);
-                                                    singleCmd = beforeAddr + "($base + " + addrStr + ")" + afterAddr;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                
-                                ss << "    " << singleCmd << "\n";
-                            }
-                        }
+                        ss << "    " << tempAct.command << "\n";
                         break;
-                    }
                     
                     case BreakpointAction::Type::ShellCommand:
                     {

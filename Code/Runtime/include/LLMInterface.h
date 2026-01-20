@@ -32,17 +32,26 @@ public:
         StaticArtifacts& outArtifacts,
         std::string& errorOut);
 
-    // Build a prompt string from collected artifacts
-    static std::string buildPrompt(const StaticArtifacts& artifacts, const std::string& targetPath);
+    // OLD APPROACH (JSON-based): Build a prompt string from collected artifacts
+    // static std::string buildPrompt(const StaticArtifacts& artifacts, const std::string& targetPath);
+    
+    // NEW APPROACH (Direct GDB script): Build a prompt for LLM to generate GDB script directly
+    static std::string buildGdbScriptPrompt(const StaticArtifacts& artifacts, const std::string& targetPath);
 
     // Write prompt to file
     static bool writePromptToFile(const std::string& prompt, const std::string& filePath, std::string& errorOut);
 
-    // Invoke LLM to generate plan.json from prompt
-    // This calls a Python script that interfaces with the LLM
+	/* OLD APPROACH (JSON-based): Invoke LLM to generate plan.json from prompt
     static bool invokeLlmForPlan(
+         const std::string& promptFilePath,
+         const std::string& outputJsonPath,
+         std::string& errorOut);
+    */
+
+    // NEW APPROACH: Invoke LLM to generate plan.gdb (GDB script) directly from prompt
+    static bool invokeLlmForGdbScript(
         const std::string& promptFilePath,
-        const std::string& outputJsonPath,
+        const std::string& outputGdbScriptPath,
         std::string& errorOut);
 
 private:

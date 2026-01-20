@@ -1,7 +1,7 @@
 #include <iostream>
 #include "RuntimeManager.h"
 
-int main()
+int main(int argc, char* argv[])
 {
 #ifdef _DEBUG
 	Logger::setMinLevel(LogLevel::Debug);
@@ -14,8 +14,19 @@ int main()
     cfg_.baseImagePath = "A:\\VMs\\linux_base.qcow2";   // your Fedora Server qcow2 golden baseline image
 	cfg_.vmDirectory = "A:\\VMs\\";
 	cfg_.artifactsRoot = "A:\\artifacts\\";
-    cfg_.sampleDirectory = "A:\\Samples\\"; // placeholder for now
-	cfg_.sampleName = "suspicious"; // placeholder for now
+    cfg_.sampleDirectory = "A:\\Samples\\";
+	
+	// Get sample name from command line, default to "suspicious"
+	if (argc >= 2)
+	{
+		cfg_.sampleName = argv[1];
+		Logger::info("[GuardAInDBG Runtime] Using sample from command line: " + cfg_.sampleName);
+	}
+	else
+	{
+		cfg_.sampleName = "suspicious";
+		Logger::info("[GuardAInDBG Runtime] No sample specified, using default: " + cfg_.sampleName);
+	}
 	cfg_.sshHost = "127.0.0.1";
 	cfg_.sshPort = 10022; // your forwarded SSH port for Fedora VM
 	cfg_.sshUser = "analyst";

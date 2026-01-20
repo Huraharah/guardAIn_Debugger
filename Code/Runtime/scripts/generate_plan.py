@@ -2,11 +2,13 @@
 """
 LLM Interface Script for guardAIn Debug Plan Generation
 
-This script reads a prompt file containing static analysis artifacts
-and generates a GDB debug plan JSON using an LLM.
+NEW APPROACH: This script reads a prompt file containing static analysis artifacts
+and generates a GDB script directly (not JSON).
+
+OLD APPROACH (commented out below): Generated JSON which was then converted to GDB script.
 
 Usage:
-    python generate_plan.py <prompt_file> <output_json_file>
+    python generate_plan.py <prompt_file> <output_gdb_file> [api_key]
 
 Configuration:
     The script uses the OPENAI_API_KEY environment variable.
@@ -20,27 +22,41 @@ import re
 from pathlib import Path
 
 
-def extract_json_from_response(response_text):
+# OLD APPROACH: Extract JSON from LLM response (not needed for GDB script generation)
+# def extract_json_from_response(response_text):
+#     """
+#     Extract JSON from LLM response, handling markdown code blocks if present.
+#     """
+#     # Try to find JSON in code blocks first
+#     json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+#     if json_match:
+#         return json_match.group(1)
+#     
+#     # Try to find JSON object directly
+#     json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+#     if json_match:
+#         return json_match.group(0)
+#     
+#     # Return the whole response if no pattern matches
+#     return response_text.strip()
+
+
+def extract_gdb_script_from_response(response_text):
     """
-    Extract JSON from LLM response, handling markdown code blocks if present.
+    NEW APPROACH: Extract GDB script from LLM response, removing markdown code fences if present.
     """
-    # Try to find JSON in code blocks first
-    json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
-    if json_match:
-        return json_match.group(1)
+    # Remove markdown code blocks if present
+    gdb_match = re.search(r'```(?:gdb|bash)?\s*(.*?)\s*```', response_text, re.DOTALL)
+    if gdb_match:
+        return gdb_match.group(1).strip()
     
-    # Try to find JSON object directly
-    json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-    if json_match:
-        return json_match.group(0)
-    
-    # Return the whole response if no pattern matches
+    # Otherwise return the whole response
     return response_text.strip()
 
 
-def generate_plan_with_openai(prompt_content, api_key=None, model=None):
+def generate_gdb_script_with_openai(prompt_content, api_key=None, model=None):
     """
-    Generate plan using OpenAI API (which Cursor uses internally).
+    NEW APPROACH: Generate GDB script directly using OpenAI API.
     
     Args:
         prompt_content: The full prompt text
@@ -48,7 +64,7 @@ def generate_plan_with_openai(prompt_content, api_key=None, model=None):
         model: Model name (or None to use environment variable or default)
     
     Returns:
-        Generated JSON plan as string
+        Generated GDB script as string
     """
     try:
         import openai
@@ -70,10 +86,8 @@ def generate_plan_with_openai(prompt_content, api_key=None, model=None):
     
     client = openai.OpenAI(api_key=api_key)
     
-            # Adjust max_tokens based on model context window
-            # For large context models, allow more output tokens
-            # Note: gpt-5-mini doesn't exist yet, user may have meant gpt-4o-mini
-    max_output_tokens = 8000 if "128k" in model or "gpt-4o-mini" in model or "gpt-5-mini" in model else 4000
+    # Adjust max_tokens based on model context window
+    #max_output_tokens = 8000 if "128k" in model or "gpt-4o-mini" in model else 4000
     
     try:
         response = client.chat.completions.create(
@@ -81,7 +95,7 @@ def generate_plan_with_openai(prompt_content, api_key=None, model=None):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert malware analyst. Generate GDB debug plans from static analysis artifacts. Always respond with valid JSON only."
+                    "content": "You are an expert malware analyst, fluent in assembly code, and well versed in anti-debugging, anti-disassembly, evasion techniques, obfuscation, encryption/decryption, and other methods to limit the ability to conduct analysis. Generate complete, executable GDB scripts from static analysis artifacts. Respond ONLY with the GDB script content, no markdown fences, no explanations."
                 },
                 {
                     "role": "user",
@@ -93,17 +107,17 @@ def generate_plan_with_openai(prompt_content, api_key=None, model=None):
         )
         
         generated_text = response.choices[0].message.content
-        json_content = extract_json_from_response(generated_text)
-        return json_content
+        gdb_script = extract_gdb_script_from_response(generated_text)
+        return gdb_script
     
     except Exception as e:
         print(f"ERROR: Failed to call OpenAI API: {e}", file=sys.stderr)
         sys.exit(1)
 
 
-def generate_plan_with_claude(prompt_content, api_key=None, model=None):
+def generate_gdb_script_with_claude(prompt_content, api_key=None, model=None):
     """
-    Generate plan using Anthropic Claude API (recommended for large contexts).
+    NEW APPROACH: Generate GDB script directly using Anthropic Claude API (recommended for large contexts).
     
     Args:
         prompt_content: The full prompt text
@@ -111,7 +125,7 @@ def generate_plan_with_claude(prompt_content, api_key=None, model=None):
         model: Model name (default: claude-3-5-sonnet-20241022)
     
     Returns:
-        Generated JSON plan as string
+        Generated GDB script as string
     """
     try:
         from anthropic import Anthropic
@@ -135,7 +149,7 @@ def generate_plan_with_claude(prompt_content, api_key=None, model=None):
         response = client.messages.create(
             model=model,
             max_tokens=8192,  # Claude supports up to 8192 output tokens
-            system="You are an expert malware analyst. Generate GDB debug plans from static analysis artifacts. Always respond with valid JSON only.",
+            system="You are an expert malware analyst. Generate complete, executable GDB scripts from static analysis artifacts. Respond ONLY with the GDB script content, no markdown fences, no explanations.",
             messages=[
                 {
                     "role": "user",
@@ -146,17 +160,17 @@ def generate_plan_with_claude(prompt_content, api_key=None, model=None):
         )
         
         generated_text = response.content[0].text
-        json_content = extract_json_from_response(generated_text)
-        return json_content
+        gdb_script = extract_gdb_script_from_response(generated_text)
+        return gdb_script
     
     except Exception as e:
         print(f"ERROR: Failed to call Claude API: {e}", file=sys.stderr)
         sys.exit(1)
 
 
-def generate_plan_with_cursor_api(prompt_content):
+def generate_gdb_script_with_cursor_api(prompt_content):
     """
-    Generate plan using Cursor's API (if available).
+    Generate GDB script using Cursor's API (if available).
     
     NOTE: This is a placeholder. Cursor's API access requires special setup.
     You may need to use Cursor's MCP server or modify this to work with your setup.
@@ -168,7 +182,7 @@ def generate_plan_with_cursor_api(prompt_content):
 
 def main():
     if len(sys.argv) < 3 or len(sys.argv) > 4:
-        print("Usage: python generate_plan.py <prompt_file> <output_json_file> [api_key]", file=sys.stderr)
+        print("Usage: python generate_plan.py <prompt_file> <output_gdb_file> [api_key]", file=sys.stderr)
         sys.exit(1)
     
     prompt_file = Path(sys.argv[1])
@@ -194,35 +208,27 @@ def main():
     llm_provider = os.environ.get("LLM_PROVIDER", "openai").lower()  # Default to OpenAI
     use_cursor = os.environ.get("USE_CURSOR_API", "").lower() == "true"
     
-    # Generate plan
+    # Generate GDB script (NEW APPROACH)
     if use_cursor:
         print("Using Cursor API (if available)...", file=sys.stderr)
-        json_content = generate_plan_with_cursor_api(prompt_content)
+        gdb_script = generate_gdb_script_with_cursor_api(prompt_content)
     elif llm_provider == "claude" or llm_provider == "anthropic":
         print(f"Using Claude API...", file=sys.stderr)
         # For Claude, use ANTHROPIC_API_KEY, but allow override if passed
         claude_key = api_key_override if api_key_override else None
-        json_content = generate_plan_with_claude(prompt_content, api_key=claude_key)
+        gdb_script = generate_gdb_script_with_claude(prompt_content, api_key=claude_key)
     else:
         model = os.environ.get("LLM_MODEL", None)  # Allow model selection via env var
-        print(f"Using OpenAI API (model: {model or 'GPT 5 Mini (default)'})...", file=sys.stderr)
+        print(f"Using OpenAI API (model: {model or 'gpt-5-mini (default)'})...", file=sys.stderr)
         # Use command-line API key if provided, otherwise use environment variable
-        json_content = generate_plan_with_openai(prompt_content, api_key=api_key_override, model=model)
+        gdb_script = generate_gdb_script_with_openai(prompt_content, api_key=api_key_override, model=model)
     
-    # Validate JSON
-    try:
-        parsed_json = json.loads(json_content)
-    except json.JSONDecodeError as e:
-        print(f"ERROR: Generated content is not valid JSON: {e}", file=sys.stderr)
-        print(f"Generated content (first 500 chars):\n{json_content[:500]}", file=sys.stderr)
-        sys.exit(1)
-    
-    # Write output
+    # Write GDB script directly (NEW APPROACH - no JSON validation needed)
     try:
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(parsed_json, f, indent=2, ensure_ascii=False)
-        print(f"Successfully generated plan: {output_file}", file=sys.stderr)
+            f.write(gdb_script)
+        print(f"Successfully generated GDB script: {output_file}", file=sys.stderr)
     except Exception as e:
         print(f"ERROR: Failed to write output file: {e}", file=sys.stderr)
         sys.exit(1)

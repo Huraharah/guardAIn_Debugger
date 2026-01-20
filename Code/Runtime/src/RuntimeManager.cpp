@@ -132,21 +132,6 @@ bool RuntimeManager::prepareSampleImage(const std::string& sampleName,
     }
     else {
         Logger::info("[RuntimeManager] Sample disk already exists: " + outSampleDiskPath);
-        // #region agent log
-        // Log that we're skipping prepare phase when disk exists
-        Logger::debug("[RuntimeManager] Skipping prepare phase - disk exists. Sample may already be in VM.");
-        // #endregion agent log
-        
-        // CRITICAL: Even when skipping prepare, we must set the disk image path
-        // Otherwise QEMU will start with an empty file= parameter
-        qemu_.setDiskImagePath(outSampleDiskPath);
-        
-        // If disk exists but was from an interrupted run, the VM might be in a bad state
-        // We have two options:
-        // 1. Always recreate the disk (safest but slower)
-        // 2. Verify sample exists in VM before proceeding (faster but requires a boot)
-        // For now, we'll proceed and let subsequent phases handle it
-        // If SSH fails, it's likely because the disk is in a bad state from a previous interrupted run
     }
 
     return true;
@@ -157,31 +142,13 @@ bool RuntimeManager::runInSnapshotVm(
     const std::string& sampleDiskPath,
     const std::function<bool(SshHelper&)>& work)
 {
-    // #region agent log
-    // Log VM start attempt
-    Logger::debug("[RuntimeManager] runInSnapshotVm: Starting VM '" + vmName + "' with disk '" + sampleDiskPath + "'");
-    // #endregion agent log
-    
-    // CRITICAL: Set the disk image path before starting VM
-    // This ensures QEMU uses the correct disk even when prepare phase was skipped
-    qemu_.setDiskImagePath(sampleDiskPath);
-    
     if (!qemu_.startVm(vmName, true)) {
         Logger::error("[RuntimeManager] Failed to start VM for " + vmName);
         return false;
     }
 
-    // #region agent log
-    // Log SSH wait attempt
-    Logger::debug("[RuntimeManager] runInSnapshotVm: Waiting for SSH to be ready (timeout: " + std::to_string(cfg_.sshTimeoutSec) + "s)");
-    // #endregion agent log
-    
     if (!ssh_.waitForReady(cfg_.sshTimeoutSec)) {
         Logger::error("[RuntimeManager] SSH not ready for " + vmName);
-        // #region agent log
-        // Log SSH failure - this might indicate disk is in bad state
-        Logger::error("[RuntimeManager] SSH connection refused - possible causes: disk in bad state from interrupted run, VM not fully booted, or SSH service not started");
-        // #endregion agent log
         qemu_.stopVm();
         return false;
     }
@@ -493,6 +460,19 @@ bool RuntimeManager::runDebugPass(const std::string& sampleName,
 
     Logger::info("[RuntimeManager] Starting debug pass for sample: " + sampleName);
 
+    // NEW APPROACH: GDB script is generated directly by LLM (no JSON→GDB translation)
+    const std::string gdbScriptHost = debugDir + "/plan.gdb";
+    
+    // Verify the GDB script exists (should have been created by generateDebugPlan)
+    if (!fs::exists(gdbScriptHost)) {
+        Logger::error("[RuntimeManager] GDB script not found: " + gdbScriptHost);
+        Logger::error("[RuntimeManager] LLM should have generated this file in generateDebugPlan()");
+        return false;
+    }
+    
+    Logger::info("[RuntimeManager] Using LLM-generated GDB script: " + gdbScriptHost);
+
+    /* OLD APPROACH (JSON-based): commented out for potential reversion
     // 1) Paths on the HOST
     const std::string planJsonHost = artifactsRoot + "/LLM/plan.json";
     const std::string gdbScriptHost = debugDir + "/plan.gdb";
@@ -508,6 +488,7 @@ bool RuntimeManager::runDebugPass(const std::string& sampleName,
         Logger::error("[RuntimeManager] See " + gdbErrorScript + " for partial script / diagnostics (if written).");
         return false;
     }
+    */
 
     // 3) Run this inside a fresh snapshot VM, using the existing helper.
     return runInSnapshotVm("debug-pass", sampleDiskPath,
