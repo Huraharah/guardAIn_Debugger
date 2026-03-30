@@ -21,6 +21,8 @@ import json
 import re
 from pathlib import Path
 
+from httpx import request
+
 
 # OLD APPROACH: Extract JSON from LLM response (not needed for GDB script generation)
 # def extract_json_from_response(response_text):
@@ -54,7 +56,7 @@ def extract_gdb_script_from_response(response_text):
     return response_text.strip()
 
 
-def generate_gdb_script_with_openai(prompt_content, api_key=None, model=None):
+def generate_gdb_script_with_openai(prompt_content, api_key=None, model=None, previous_response_id=None):
     """
     NEW APPROACH: Generate GDB script directly using OpenAI API.
     
@@ -62,70 +64,90 @@ def generate_gdb_script_with_openai(prompt_content, api_key=None, model=None):
         prompt_content: The full prompt text
         api_key: OpenAI API key (or None to use environment variable)
         model: Model name (or None to use environment variable or default)
+        previous_response_id: Optional response ID from previous iteration for refinement
     
     Returns:
-        Generated GDB script as string
+        Tuple of (generated GDB script as string, response_id as string)
     """
     try:
-        import openai
+        from openai import OpenAI
     except ImportError:
         print("ERROR: openai library not installed. Install with: pip install openai", file=sys.stderr)
         print("\nAlternatively, you can use Cursor's API by modifying this script.", file=sys.stderr)
         sys.exit(1)
-    
+
     if api_key is None:
         api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            print("ERROR: OPENAI_API_KEY environment variable not set.", file=sys.stderr)
-            print("Either set OPENAI_API_KEY or modify this script to use Cursor's API.", file=sys.stderr)
-            sys.exit(1)
-    
-    # Determine model - check environment variable first, then use provided model, then default
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY environment variable not set.")
+
     if model is None:
-        model = os.environ.get("LLM_MODEL", "gpt-5-mini")  # Default to cheaper model with large context
-    
-    client = openai.OpenAI(api_key=api_key)
-    
-    # Adjust max_tokens based on model context window
-    #max_output_tokens = 8000 if "128k" in model or "gpt-4o-mini" in model else 4000
-    
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert malware analyst, fluent in assembly code, and well versed in anti-debugging, anti-disassembly, evasion techniques, obfuscation, encryption/decryption, and other methods to limit the ability to conduct analysis. Generate complete, executable GDB scripts from static analysis artifacts. Respond ONLY with the GDB script content, no markdown fences, no explanations."
-                },
-                {
-                    "role": "user",
-                    "content": prompt_content
-                }
-            ],
-            #temperature=0.3,  # Lower temperature for more deterministic output
-            #max_tokens=max_output_tokens
-        )
-        
-        generated_text = response.choices[0].message.content
-        gdb_script = extract_gdb_script_from_response(generated_text)
-        return gdb_script
-    
-    except Exception as e:
-        print(f"ERROR: Failed to call OpenAI API: {e}", file=sys.stderr)
-        sys.exit(1)
+        model = os.environ.get("LLM_MODEL", "gpt-5.2")
+
+    client = OpenAI(api_key=api_key)
+
+    system_text = (
+        "You are an expert malware analyst, fluent in assembly code, and well versed in anti-debugging, "
+        "anti-disassembly, evasion techniques, obfuscation, encryption/decryption, and other methods to "
+        "limit the ability to conduct analysis. Generate complete, executable GDB scripts from static "
+        "analysis artifacts. Respond ONLY with the GDB script content, no markdown fences, no explanations."
+    )
 
 
-def generate_gdb_script_with_claude(prompt_content, api_key=None, model=None):
+    input_items = [
+        {"role": "system", "content": system_text},
+        {"role": "user", "content": prompt_content},
+    ]
+
+    request = {
+        "model": model,
+        "input": input_items
+    }
+    if previous_response_id:
+        request["previous_response_id"] = previous_response_id
+
+    resp = client.responses.create(**request)
+
+    generated_text = (getattr(resp, "output_text", None) or "").strip()
+    response_id = getattr(resp, "id", None)
+
+    if not generated_text:
+        print('[GENERATE_PLAN] DEBUG: Full response stored to "./artifacts/debug/llmerr.json"')
+
+        os.makedirs("./artifacts/debug", exist_ok=True)
+
+        with open("./artifacts/debug/llmerr.json", "w", encoding="utf-8") as f:
+            try:
+                json.dump(resp.model_dump(), f, indent=2)
+            except Exception as e:
+                f.write(f"Failed to serialize model_dump(): {e}\n")
+                f.write(str(resp))
+
+        print(f"[LLM DEBUG] Response ID: {resp.id}")
+        print(f"[LLM DEBUG] Status: {resp.status}")
+        print(f"[LLM DEBUG] Usage: {resp.usage}")
+        print(f"[LLM DEBUG] Output Text: {generated_text}")
+
+        raise RuntimeError(f"No output text generated by the model. Response ID: {resp.id}")
+
+    if not response_id:
+        raise RuntimeError("No response ID returned by the model.")
+
+    return generated_text, response_id
+    
+def generate_gdb_script_with_claude(prompt_content, api_key=None, model=None, conversation_history_file=None, gdb_log_file=None):
     """
     NEW APPROACH: Generate GDB script directly using Anthropic Claude API (recommended for large contexts).
     
     Args:
-        prompt_content: The full prompt text
+        prompt_content: The full prompt text (for first iteration) or new user message (for subsequent iterations)
         api_key: Anthropic API key (or None to use ANTHROPIC_API_KEY environment variable)
         model: Model name (default: claude-3-5-sonnet-20241022)
+        conversation_history_file: Path to JSON file containing conversation history (for iterations > 1)
+        gdb_log_file: Path to GDB log file for refinement (for iterations > 1)
     
     Returns:
-        Generated GDB script as string
+        Tuple of (generated GDB script as string, response_id as string, updated_messages list)
     """
     try:
         from anthropic import Anthropic
@@ -145,23 +167,66 @@ def generate_gdb_script_with_claude(prompt_content, api_key=None, model=None):
     
     client = Anthropic(api_key=api_key)
     
+    # Build messages array from conversation history or start fresh
+    messages = []
+    if conversation_history_file and os.path.exists(conversation_history_file):
+        # Load existing conversation history
+        try:
+            with open(conversation_history_file, 'r', encoding='utf-8') as f:
+                messages = json.load(f)
+            print(f"Loaded conversation history with {len(messages)} messages", file=sys.stderr)
+        except Exception as e:
+            print(f"WARNING: Failed to load conversation history: {e}", file=sys.stderr)
+            messages = []
+    
+    # If this is a refinement (we have history or GDB log), append new user message
+    if len(messages) > 0 or gdb_log_file:
+        # Build refinement message
+        refinement_msg = "Please revise the GDB script to fix any issues and continue toward extracting the flag. "
+        refinement_msg += "Output only the updated GDB script, no markdown fences, no explanations.\n"
+        
+        if gdb_log_file:
+            try:
+                with open(gdb_log_file, 'r', encoding='utf-8') as f:
+                    gdb_log = f.read()
+                refinement_msg += f"\n\n## Previous Attempt Result\n\n"
+                refinement_msg += "The previous GDB script was executed with the following result:\n\n"
+                refinement_msg += "```\n"
+                refinement_msg += gdb_log
+                refinement_msg += "\n```\n"
+            except Exception as e:
+                print(f"WARNING: Failed to read GDB log: {e}", file=sys.stderr)
+        
+        messages.append({
+            "role": "user",
+            "content": refinement_msg
+        })
+    else:
+        # First iteration: use the full prompt as the first user message
+        messages.append({
+            "role": "user",
+            "content": prompt_content
+        })
+    
     try:
         response = client.messages.create(
             model=model,
             max_tokens=8192,  # Claude supports up to 8192 output tokens
             system="You are an expert malware analyst. Generate complete, executable GDB scripts from static analysis artifacts. Respond ONLY with the GDB script content, no markdown fences, no explanations.",
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt_content
-                }
-            ],
-            temperature=0.3
+            messages=messages
         )
         
         generated_text = response.content[0].text
         gdb_script = extract_gdb_script_from_response(generated_text)
-        return gdb_script
+        response_id = response.id  # Capture response ID
+        
+        # Append assistant response to conversation history
+        messages.append({
+            "role": "assistant",
+            "content": generated_text
+        })
+        
+        return gdb_script, response_id, messages
     
     except Exception as e:
         print(f"ERROR: Failed to call Claude API: {e}", file=sys.stderr)
@@ -181,19 +246,26 @@ def generate_gdb_script_with_cursor_api(prompt_content):
 
 
 def main():
-    if len(sys.argv) < 3 or len(sys.argv) > 4:
-        print("Usage: python generate_plan.py <prompt_file> <output_gdb_file> [api_key]", file=sys.stderr)
+    if len(sys.argv) < 3 or len(sys.argv) > 9:
+        print("Usage: python generate_plan.py <prompt_file> <output_gdb_file> [api_key] [previous_response_id] [gdb_log_file] [model] [provider] [conversation_history_file]", file=sys.stderr)
         sys.exit(1)
     
     prompt_file = Path(sys.argv[1])
     output_file = Path(sys.argv[2])
-    api_key_override = sys.argv[3] if len(sys.argv) == 4 else None
+    # Handle empty strings from C++ (empty strings are passed as "")
+    api_key_override = sys.argv[3] if len(sys.argv) >= 4 and sys.argv[3] and len(sys.argv[3]) > 0 else None
+    previous_response_id = sys.argv[4] if len(sys.argv) >= 5 and sys.argv[4] and len(sys.argv[4]) > 0 else None
+    gdb_log_file = sys.argv[5] if len(sys.argv) >= 6 and sys.argv[5] and len(sys.argv[5]) > 0 else None
+    model_override = sys.argv[6] if len(sys.argv) >= 7 and sys.argv[6] and len(sys.argv[6]) > 0 else None
+    provider_override = sys.argv[7] if len(sys.argv) >= 8 and sys.argv[7] and len(sys.argv[7]) > 0 else None
+    conversation_history_file = sys.argv[8] if len(sys.argv) >= 9 and sys.argv[8] and len(sys.argv[8]) > 0 else None
     
     if not prompt_file.exists():
         print(f"ERROR: Prompt file not found: {prompt_file}", file=sys.stderr)
         sys.exit(1)
     
-    # Read prompt
+    # Read prompt (for OpenAI or first Anthropic iteration)
+    prompt_content = ""
     try:
         with open(prompt_file, 'r', encoding='utf-8') as f:
             prompt_content = f.read()
@@ -201,27 +273,65 @@ def main():
         print(f"ERROR: Failed to read prompt file: {e}", file=sys.stderr)
         sys.exit(1)
     
+    # Determine provider early to handle refinement differently
+    llm_provider = provider_override if provider_override else os.environ.get("LLM_PROVIDER", "openai").lower()
+    
+    # For OpenAI: append GDB log to prompt if this is a refinement
+    if llm_provider != "claude" and llm_provider != "anthropic" and previous_response_id and gdb_log_file:
+        try:
+            with open(gdb_log_file, 'r', encoding='utf-8') as f:
+                gdb_log = f.read()
+            prompt_content += f"\n\n## Previous Attempt Result\n\n"
+            prompt_content += f"The previous GDB script (response_id: {previous_response_id}) was executed with the following result:\n\n"
+            prompt_content += "```\n"
+            prompt_content += gdb_log
+            prompt_content += "\n```\n\n"
+            prompt_content += "Please revise the GDB script to fix any issues and continue toward extracting the flag. "
+            prompt_content += "Output only the updated GDB script, no markdown fences, no explanations.\n"
+        except Exception as e:
+            print(f"WARNING: Failed to read GDB log file: {e}", file=sys.stderr)
+    
     print(f"Reading prompt from: {prompt_file}", file=sys.stderr)
     print(f"Prompt size: {len(prompt_content)} characters", file=sys.stderr)
+    if previous_response_id:
+        print(f"Refining previous response: {previous_response_id}", file=sys.stderr)
+    if conversation_history_file:
+        print(f"Using conversation history: {conversation_history_file}", file=sys.stderr)
     
-    # Determine which API to use
-    llm_provider = os.environ.get("LLM_PROVIDER", "openai").lower()  # Default to OpenAI
+    # Determine which API to use (already determined above)
     use_cursor = os.environ.get("USE_CURSOR_API", "").lower() == "true"
     
     # Generate GDB script (NEW APPROACH)
+    response_id = None
+    updated_messages = None  # For Anthropic conversation history
+    
     if use_cursor:
         print("Using Cursor API (if available)...", file=sys.stderr)
         gdb_script = generate_gdb_script_with_cursor_api(prompt_content)
     elif llm_provider == "claude" or llm_provider == "anthropic":
-        print(f"Using Claude API...", file=sys.stderr)
+        # Use model from command line or environment, default to claude-3-5-sonnet-20241022
+        model = model_override if model_override else os.environ.get("LLM_MODEL", "claude-3-5-sonnet-20241022")
+        print(f"Using Claude API (model: {model})...", file=sys.stderr)
         # For Claude, use ANTHROPIC_API_KEY, but allow override if passed
         claude_key = api_key_override if api_key_override else None
-        gdb_script = generate_gdb_script_with_claude(prompt_content, api_key=claude_key)
+        gdb_script, response_id, updated_messages = generate_gdb_script_with_claude(
+            prompt_content, 
+            api_key=claude_key, 
+            model=model,
+            conversation_history_file=conversation_history_file,
+            gdb_log_file=gdb_log_file
+        )
     else:
-        model = os.environ.get("LLM_MODEL", None)  # Allow model selection via env var
-        print(f"Using OpenAI API (model: {model or 'gpt-5-mini (default)'})...", file=sys.stderr)
+        # Use model from command line or environment, default to gpt-5-mini
+        model = model_override if model_override else os.environ.get("LLM_MODEL", "gpt-5-mini")
+        print(f"Using OpenAI API (model: {model})...", file=sys.stderr)
         # Use command-line API key if provided, otherwise use environment variable
-        gdb_script = generate_gdb_script_with_openai(prompt_content, api_key=api_key_override, model=model)
+        gdb_script, response_id = generate_gdb_script_with_openai(
+            prompt_content, 
+            api_key=api_key_override, 
+            model=model,
+            previous_response_id=previous_response_id
+        )
     
     # Write GDB script directly (NEW APPROACH - no JSON validation needed)
     try:
@@ -229,6 +339,25 @@ def main():
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(gdb_script)
         print(f"Successfully generated GDB script: {output_file}", file=sys.stderr)
+        
+        # Write response ID to a separate file for iterative refinement (OpenAI)
+        if response_id:
+            response_id_file = output_file.parent / (output_file.stem + ".response_id")
+            with open(response_id_file, 'w', encoding='utf-8') as f:
+                f.write(response_id)
+            print(f"Response ID saved to: {response_id_file}", file=sys.stderr)
+        
+        # Write conversation history for Anthropic (save to same path as input or create new)
+        if updated_messages is not None:
+            if conversation_history_file:
+                history_file = Path(conversation_history_file)
+            else:
+                # Create new conversation history file
+                history_file = output_file.parent / (output_file.stem + ".conversation.json")
+            
+            with open(history_file, 'w', encoding='utf-8') as f:
+                json.dump(updated_messages, f, indent=2)
+            print(f"Conversation history saved to: {history_file}", file=sys.stderr)
     except Exception as e:
         print(f"ERROR: Failed to write output file: {e}", file=sys.stderr)
         sys.exit(1)

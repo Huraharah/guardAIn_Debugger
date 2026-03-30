@@ -1,0 +1,117 @@
+### 3. Breakpoints and Logic
+
+**TASK**: Analyze the binary to extract the flag. This is a CTF-style reverse engineering challenge.
+
+**CRITICAL REQUIREMENTS:**
+1. **Command-Line Arguments**: Examine the binary's usage patterns and strings to determine what arguments it expects.
+   - Look for usage messages, error messages, or string comparisons that indicate required arguments
+   - Set the program arguments using GDB's `set args` command BEFORE starting execution, immediately after the 'Script Header' section and before the 'Base Address Initialization (Python Block)' above
+   - If you cannot determine the exact argument from static analysis, use a placeholder value and let the program run
+   - The program may reveal the required format through its behavior
+   - Important: If the inferior is ever killed, the argument(s) must be re-set before running the program again. Also, whenever the argument(s) is/are set, ensure that the program is started afterwords - otherwise, it will not recognize the argument(s)
+   - If an argument is supplied as a dummy argument - do not use the flag format, as this may cause a false positive. Instead, use a random string of appropriate length, or use something like 'fake_flag-GPT-ADS' (the fake flag format that we used in class).
+   - After setting the argument(s), always follow with the "show args" command to show what it was set to within the log for future iterations
+2. **Flag Extraction**: The primary goal of these challenges are to extract the flag
+   - The flag will be in the format `flag_{...}`
+   - Look for calls to functions that compare either string or memory
+   - Understand what parameters are passed to such a function - trace them back, you will likely find the flag
+   - Critical point: The flag MUST be known and returned to the user - even if runs end in failure, as long as the flag is identified.
+      - This means no quick "bypass" methods to force the successful path without performing the relevant operations to recover the flag
+      - This restriction does NOT override changes that must be performed to successfully recover the flag, such as bypassing anti-debugging or anti-disassembly, nor does it apply if the flag was previously recovered
+   - If the prior iteration log has the line "set args flag_{...}" and the whole of the flag is an appropriate length, include that same line in the next script - the flag was found, but the prior script likely had an error. This includes if the program hits one of the failure lines - there could have been something else that caused the failure, such as anti-debugging.  Remember to retain the found flag through all subsequent iterations
+3. **Decryption**: The flag may be encrypted, and must be decrypted to plaintext.
+   - Encryption/Decryption could be performed on the flag, the arg, or a copy of either - read the file and determine which it is
+   - If needed, modify the argument passed to the encryption function(s) to encrypt/decrypt the needed information, such as the flag itself
+   - Algorythm can be as simple as a single-byte XOR to any number of standard protocols (RC4, AES, etc), or even lesser-known algorythms (Salsa, Cha-Cha, etc)
+   - Higher levels may encrypt sections of byte code in addition to the flag - these sections will have to also be decrypted for success!
+   - Brute Force is NEVER required to solve these. All of the information needed is within the binary, including keys, cyphertexts, and method(s) used
+   - Follow the encryption method used - it could be a stream/block cypher with states based off of the key. If needed, use GDB's "call" function to call the encryption function(s) with the flag cyphertext. If you use this method, you must always cast the return type, IE 'call (void)<address>(...)'
+   - Alternatively, reverse the encryption method through a script (do NOT output this script), and submit that flag as an arg
+4. **Success Detection**: The program will print a success message when the correct flag is provided
+   - Look for success messages in the strings output (e.g., "[*] You achieved level 1!")
+   - Messages that say "[-] You are not leet enough" and "[!] Usage: %s <password>" are considered failure conditions
+   - Any script that results in any other output (including signal code failures such as SIGSEGV, SIGTRAP, etc, as well as errors in source command code) are considered errors, with no results - with these, the flag may have been extracted correctly, but something else caused the program to have a fault. In this case, verify the correct code in the script, and re-submit
+5. **Obfuscation**: The binary may be striped, leaving no symbols
+   - You will have to follow the bytecode if need be to find the correct information
+   - Do not rely on call names - verify through the function's utility
+6. **Anti-debugging**: The program may conduct various anti-debugging checks.
+   - If there is a signal that can be handled, use "handle <signal> nostop noprint nopass" to bypass - this will ensure a successful bypass. **NOTE** It is vital that all three are "no..." - otherwise, it will still hit the signal call ("handle SIGTRAP nostop noprint pass" for example will still fail)
+   - Example: For SIGTRAP anti-debugging, use "handle SIGTRAP nostop noprint nopass" before starting execution
+   - If there are other methods of anti-debugging, such as "/proc/self/status", time checks, trace, etc, ensure that these are bypassed as appropriate, normally with register changes after the return from the appropriate function before the test/check
+7. **CRITICAL**: Your script MUST allow the program to run to completion to see the output message
+   - Do NOT stop at the return from main() or call `quit` before the program finishes
+   - After extracting the flag or setting breakpoints, use `continue` to let the program finish naturally
+   - Always ensure that the program will run after setting and/or hitting breakpoints
+   - Only use `quit` at the very end of the script, after the program has completed execution
+   - The success message will appear in the program's output, not in GDB's output
+
+**TASK SEQUENCING**
+1. Identify where the flag is in memory, regardless if it is in plaintext or cyphertext2. Identify any encryption methods used, and what the code as written uses it on3. Use available methods, such as "call" or register manipulation on the stack at the call to the encryption methods
+4. Submit the flag as an argument in the next pass. Additionally, for the next pass, instead of attempting to debug, just set the argument and run without breakpoints - it might succeed with no other need for refinement.
+5. If it still does not succeed, identify possible anti-debugging or anti-disassembly within the code, and attempt to bypass it
+6. Iterative corrections will continue for a total of 10 iterations - if unsuccessful after the 10th iteration, attempt will cease
+   **CRITICAL**: If the flag is uncovered in a prior attempt (ie, the arg is set with the "set arg flag_{<hexadecimal flag value>}" pattern and is in the log after the "show args" command), continue to set the flag to this value on ALL subsequent iterations
+
+**ADDRESS HANDLING:**
+- For **PIE binaries** (file info: "dynamically linked", readelf: "Type: DYN"): Use `*($base + 0xOFFSET)` for all breakpoints
+- For **non-PIE/static binaries** (file info: "statically linked", readelf: "Type: EXEC"): Use `*($base + 0xADDRESS)` where ADDRESS is the objdump address. Base will be 0, so it becomes absolute.
+- **Summary**: ALWAYS use `*($base + <hex_from_objdump>)` format. The initialization script handles PIE vs non-PIE automatically.
+- **IMPORTANT**: For non-PIE/statically-linked binaries, do NOT set breakpoints in library code (libc functions like malloc, free, etc.). Only break in the main binary code.
+
+**BREAKPOINT FORMAT:**
+```gdb
+# Important: do NOT use the "silent" command in breakpoints
+# Example: Breakpoint at entry point with snapshot and continuation
+break *($base + 0x1600)
+commands
+  echo [guardAIn] Hit entry point\n
+  info registers
+  x/16i $pc
+  x/16gx $rsp
+  show args
+  continue
+end
+
+# Example: Anti-debug bypass (setjmp)
+break *($base + 0x3652)
+commands
+  echo [guardAIn] Bypassing setjmp anti-debug\n
+  set $rax = 1
+  info registers
+  continue
+end
+
+# Example: Capture memfd file
+break *($base + 0x23a0)
+commands
+  echo [guardAIn] memfd_create called\n
+  shell cp /proc/$pid/fd/3 /tmp/memfd_dump.bin 2>/dev/null || true
+  shell ls -l /proc/$pid/fd > /tmp/memfd_fds.txt 2>/dev/null || true
+  continue
+end
+
+# Example: Final breakpoint (let program finish)
+break *($base + 0x5000)
+commands
+  echo [guardAIn] Hit final breakpoint - allowing program to finish\n
+  info registers
+  continue
+end
+
+# At the end of script, let program finish then quit GDB
+continue
+quit
+```
+
+**IMPORTANT RULES:**
+- All register names must be LOWERCASE (e.g., `$rax`, not `$RAX` or `$EAX`) - GDB requires lowercase
+- Use `$pid` variable for process ID (already set by initialization Python block)
+- Do NOT use getpid() function in GDB commands - use the `$pid` variable instead
+- Always `continue` at the end of a command block unless it's the final breakpoint
+- Any artifacts generated, store to "/tmp/guardAIn/*" to allow for easy retrieval
+- **CRITICAL**: Do NOT stop execution at the return from main() - let the program finish to see success/failure messages
+- For temporary breakpoints (hit once then deleted), use `tbreak` instead of `break`
+- End the script with `continue` to let the program finish, then `quit` to exit GDB
+- Each GDB command should be on its own line - do NOT chain commands with semicolons
+- **DO NOT** use `quit` in breakpoint commands - use `quit` only at the very end of the script after the program completes
+

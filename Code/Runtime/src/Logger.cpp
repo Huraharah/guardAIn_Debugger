@@ -67,10 +67,11 @@ void Logger::setMinLevel(LogLevel level)
 const char* Logger::levelToString(LogLevel level)
 {
     switch (level) {
-    case LogLevel::Debug: return "DEBUG";
-    case LogLevel::Info:  return "INFO ";
-    case LogLevel::Warn:  return "WARN ";
-    case LogLevel::Error: return "ERROR";
+    case LogLevel::Debug:    return "DEBUG";
+    case LogLevel::Info:     return "INFO ";
+    case LogLevel::Warn:     return "WARN ";
+    case LogLevel::Error:    return "ERROR";
+    case LogLevel::Critical: return "CRIT ";
     }
     return "UNKWN";
 }

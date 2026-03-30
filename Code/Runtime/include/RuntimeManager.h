@@ -12,6 +12,8 @@
 #include "GdbScriptBuilder.h"
 #include "DebugPlan.h"
 #include "LlmInterface.h"
+#include "QemuMonitorClient.h"
+#include "AnalysisCoordinator.h"
 
 class RuntimeManager {
 public:
@@ -25,6 +27,7 @@ private:
 	QemuController qemu_;
 	SshHelper ssh_;
 	TraceCollector trace_;
+    AnalysisCoordinator coordinator_;
 
     // Core pipeline helpers
     bool prepareSampleImage(const std::string& sampleName,
@@ -50,7 +53,39 @@ private:
 
     bool runDebugPass(const std::string& sampleName,
         const std::string& sampleDiskPath,
-        const std::string& artifactsRoot);
+        const std::string& artifactsRoot,
+        const std::string& localGdbLogPath = "",
+        int iteration = 0);
+    
+    // Internal helper that accepts debug directory directly (for model-specific paths)
+    bool runDebugPassWithDir(const std::string& sampleName,
+        const std::string& sampleDiskPath,
+        const std::string& debugDir,
+        const std::string& localGdbLogPath,
+        int iteration);
+
+    // Helper to check GDB log for success/failure
+    enum class DebugResult {
+        Success,      // Found success message (e.g., "You achieved level 1!")
+        Failure,      // Found failure message (e.g., "You are not leet enough" or usage message)
+        Error,        // Program crashed or hit signal
+        Unknown       // Could not determine result
+    };
+    static DebugResult parseGdbLogResult(const std::string& gdbLogPath);
+
+    // Run iterative LLM refinement for a single model
+    struct ModelRunResult {
+        bool success = false;
+        int iterations = 0;
+        std::string finalFlag;  // If flag was extracted
+    };
+    ModelRunResult runModelIterations(
+        const std::string& sampleName,
+        const std::string& sampleDiskPath,
+        const std::string& artifactsRoot,
+        const std::string& modelName,
+        const std::string& modelDebugDir,  // e.g., "debug/openai" or "debug/claude"
+        const std::string& promptPath);
 
     // Generic snapshot-VM runner
     bool runInSnapshotVm(const std::string& vmName,

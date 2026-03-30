@@ -84,9 +84,8 @@ bool QemuController::startVm(const std::string& vmName, bool useSnapshot)
         args += "-snapshot ";
     }
     args += "-drive file=" + m_diskImagePath + ",if=virtio,format=qcow2 ";
-    args += "-nic user,hostfwd=tcp::10022-:22 ";
-    args += "-qmp tcp:localhost:4444,server,nowait ";
-    args += "-nographic";
+    args += "-nic user,hostfwd=tcp:127.0.0.1:10022-:22 ";
+    args += "-monitor tcp:127.0.0.1:10023,server,nowait ";
 
     Logger::info(std::string("[QEMUController] Starting VM '") + vmName + std::string("' using:"));
     Logger::info(std::string("    ") + m_qemuExecutable + " " + args);

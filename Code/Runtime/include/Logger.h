@@ -9,7 +9,8 @@ enum class LogLevel {
     Debug = 0,
     Info,
     Warn,
-    Error
+    Error,
+    Critical
 };
 
 class Logger {
@@ -29,6 +30,7 @@ public:
     static void info(const std::string& message) { log(LogLevel::Info, message); }
     static void warn(const std::string& message) { log(LogLevel::Warn, message); }
     static void error(const std::string& message) { log(LogLevel::Error, message); }
+    static void critical(const std::string& message) { log(LogLevel::Critical, message); }
 
 private:
     static std::mutex& getMutex();

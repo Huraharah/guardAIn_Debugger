@@ -1,9 +1,20 @@
 #include "SshHelper.h"
 
 #include <iostream>
+#include <fstream>
 #include <chrono>
 #include <thread>
 #include <cstdlib>  // std::system
+#include <cstdio>   // POPEN/PCLOSE
+#include <sstream>
+
+#ifdef _WIN32
+#define POPEN _popen
+#define PCLOSE _pclose
+#else
+#define POPEN popen
+#define PCLOSE pclose
+#endif
 
 SshHelper::SshHelper(const RuntimeConfig& cfg)
     : m_host(cfg.sshHost),
@@ -69,6 +80,26 @@ bool SshHelper::runRemote(const std::string& remoteCommand)
         return false;
     }
     return true;
+}
+
+bool SshHelper::runRemoteGetOutput(const std::string& remoteCommand, std::string& output)
+{
+    std::string cmd = "ssh -p " + std::to_string(m_port) + " "
+        + buildCommonSshOptions()
+        + m_user + "@" + m_host + " \"" + remoteCommand + "\"";
+    output.clear();
+    FILE* pipe = POPEN(cmd.c_str(), "rt");
+    if (!pipe) {
+        Logger::warn("[SshHelper] runRemoteGetOutput: failed to open pipe for SSH command.");
+        return false;
+    }
+    std::ostringstream oss;
+    char buf[256];
+    while (fgets(buf, sizeof(buf), pipe) != nullptr)
+        oss << buf;
+    int rc = PCLOSE(pipe);
+    output = oss.str();
+    return (rc == 0);
 }
 
 bool SshHelper::copyTo(const std::string& localPath,
