@@ -294,3 +294,11 @@ High-level design of MCP components and their interactions.
 ```
 TODO: figure out milestones for MCP components and their interactions.
 ```
+
+
+
+## License
+
+Copyright © 2026 Alexander Schoolcraft.
+
+This project is licensed under the Apache License 2.0. See the LICENSE file for details.
