@@ -877,15 +877,6 @@ bool RuntimeManager::analyzeSample()
         return false;
     }
 
-    if (cfg_.mcpSidecarEnabled) {
-        McpSidecarConfig mcpCfg;
-        mcpCfg.enabled = true;
-        mcpCfg.sampleBinaryHostPath = samplePath;
-        mcpCfg.artifactsRoot = artifactsRoot;
-        mcpCfg.ghidraInstallDir = cfg_.ghidraInstallDir;
-        coordinator_.startStaticMcpParallel(mcpCfg);
-    }
-
     // Skip static analysis and dynamic tracing if reusing artifacts
     if (cfg_.cleanRun) {
         std::this_thread::sleep_for(2s); // brief pause
@@ -919,8 +910,6 @@ bool RuntimeManager::analyzeSample()
     } else {
         Logger::info("[RuntimeManager] Skipping static analysis and dynamic tracing (reusing artifacts)");
     }
-
-    coordinator_.joinStaticMcpBeforeLlm();
 
     // 2.5) Generate LLM debug plan from static analysis and run iterative refinement
     const std::string targetPath = "/home/" + cfg_.sshUser + "/" + sampleName;

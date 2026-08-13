@@ -7,13 +7,9 @@
 #include "Logger.h"
 #include "QemuController.h"
 #include "SshHelper.h"
-#include "DebugController.h"
 #include "TraceCollector.h"
-#include "GdbScriptBuilder.h"
-#include "DebugPlan.h"
 #include "LlmInterface.h"
 #include "QemuMonitorClient.h"
-#include "AnalysisCoordinator.h"
 
 class RuntimeManager {
 public:
@@ -27,7 +23,6 @@ private:
 	QemuController qemu_;
 	SshHelper ssh_;
 	TraceCollector trace_;
-    AnalysisCoordinator coordinator_;
 
     // Core pipeline helpers
     bool prepareSampleImage(const std::string& sampleName,
@@ -37,19 +32,23 @@ private:
         const std::string& sampleDiskPath,
         const std::string& artifactsRoot);
 
+    /*
     bool runStaticToolsPass(const std::string& sampleName,
         const std::string& sampleDiskPath,
         const std::string& artifactsRoot);
+        */
 
     bool runStracePass(const std::string& sampleName,
         const std::string& sampleDiskPath,
         const std::string& artifactsRoot,
         int runIndex = 1);
 
+    /*
     bool runLtracePass(const std::string& sampleName,
         const std::string& sampleDiskPath,
         const std::string& artifactsRoot,
         int runIndex = 1);
+        */
 
     bool runDebugPass(const std::string& sampleName,
         const std::string& sampleDiskPath,

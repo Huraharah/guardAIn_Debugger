@@ -1,301 +1,258 @@
-﻿# guardAIn Debugger - An AI-Powered Debugging Tool
+# guardAInDBG
 
-building checklists by modules and their interactions with the CoreEngine.
+> A research platform for evaluating OpenAI's ChatGPT and Anthropic's Claude in automated reverse engineering and dynamic malware analysis through an iterative feedback loop within a controlled execution environment.
 
-## Runtime
+## Project Status
 
-### Development Roadmap
+Research prototype developed for M.S. Thesis evaluation. This repository represents the experimental implementation and is not intended as a production malware-analysis program.
 
-High-level milestones for the LLM-driven QEMU debugger prototype.  
-Each milestone is broken down into concrete, checkable tasks.
+## Overview
 
----
+This project uses a QEMU-based virtualized environment running Alpine Linux to perform automated static and dynamic analysis on a series of capture-the-flag-style reverse engineering challenges that increase in complexity across successive levels. The system programmatically collects static-analysis artifacts using tools such as `binwalk`, `objdump`, and `strings`, then combines those artifacts with task-specific instructions to construct a prompt for the selected LLM. The model's response is constrained to a GDB script, which is executed against the challenge binary in an attempt to extract and validate the flag. Results from each attempt are then incorporated into subsequent prompts, creating an iterative feedback loop that allows the model to refine its analysis and debugging strategy.
 
-#### :white_check_mark:  Milestone 0 – Project Skeleton & Scaffolding
+This architecture provides a consistent experimental framework for evaluating how effectively each model can interpret reverse engineering artifacts, formulate debugging strategies, respond to unsuccessful attempts, and adapt its approach as challenge complexity increases.
 
-- [x] Create core project structure
-  - [x] `core/` for backend logic
-  - [x] `cli/` for command-line entry point
-  - [x] `config/` for config files
-- [x] Create initial core headers
-  - [x] `RuntimeManager.hpp` stub
-  - [x] `QemuController.hpp` stub
-  - [x] Add `#pragma once` guards
-- [x] Add basic build setup
-  - [x] Configure project in IDE / build system (VS solution / CMake, etc.)
-  - [x] Ensure `core/` and `cli/` targets build (even if mostly empty)
-- [x] Initialize README with project overview and roadmap
 
----
+## System Architecture
 
-#### :white_check_mark:  Milestone 1 – QEMU Controller Can Launch & Stop QEMU
+### Runtime Architecture
 
-**Goal:** From `main.cpp`, start and stop QEMU in a controlled way.
+![runtime_arch](./docs/Diagrams/Runtime/runtime_arch.jpeg)
 
-- [x] Decide canonical QEMU install path for this project
-  - [x] Choose primary path (`A:\QEMU\`)
-  - [x] Store in a config file (`config/config.json` or `.ini`)
-- [x] Implement `QemuController` process management
-  - [x] Add code to construct a QEMU command line from config
-  - [x] Implement `bool QemuController::startVm(const std::string& vmName)`
-    - [x] Spawn QEMU process (initially via `std::system` or similar)
-    - [x] Log full command line on launch
-  - [x] Implement `bool QemuController::stopVm()`
-    - [x] For now, send a simple kill/terminate to the process
-  - [x] Implement `bool QemuController::isRunning() const`
-- [x] Add a simple CLI harness
-  - [x] `cli/main.cpp` calls `QemuController::startVm()`
-  - [x] Wait a few seconds, then call `stopVm()`
-  - [x] Print success/failure status to console
-- [x] Manual smoke test
-  - [x] Run binary and confirm QEMU appears briefly, then exits
-  - [x] Capture any QEMU stdout/stderr to a log file
+### Runtime Execution Flow
 
----
+![runtime_exe_flow](./docs/Diagrams/Runtime/runtime_execution_flow.jpeg)
 
-#### :white_check_mark:  Milestone 2 – QMP Control & Baseline Snapshot
+## Research 
 
-**Goal:** Programmatically talk to QEMU via QMP and create a baseline snapshot.
+### Research Objective
 
-- [x] Extend QEMU launch options in `QemuController`
-  - [x] Start QEMU with QMP TCP or UNIX socket, e.g. `-qmp tcp:localhost:4444,server,nowait`
-  - [x] Ensure QEMU starts successfully with these options
-- [x] Implement a minimal `QmpClient` inside `QemuController`
-  - [x] Connect to QMP socket
-  - [x] Read initial QMP greeting
-  - [x] Send `{"execute": "qmp_capabilities"}` and parse response
-  - [x] Implement `queryStatus()` (e.g., QMP `query-status`)
-- [x] Add snapshot methods to `QemuController`
-  - [x] `bool createSnapshot(const std::string& name)`
-  - [x] `bool loadSnapshot(const std::string& name)`
-  - [x] Handle errors from QMP and log them
-- [x] Baseline workflow
-  - [x] Boot VM manually to a clean state (guest OS installed & configured)
-  - [x] From code, call `createSnapshot("baseline_clean")`
-  - [x] Verify you can `loadSnapshot("baseline_clean")` and the VM resumes correctly
-- [x] Update README with:
-  - [x] QMP usage explanation
-  - [x] Instructions for creating the first baseline snapshot
+The primary research objective of this project was to evaluate the effectiveness of publicly available LLMs at increasingly complex reverse engineering tasks through iterative feedback and refinement.
 
----
+### Experimental Design
 
-#### :white_check_mark: Milestone 3 – First Run: “Natural” Execution & Trace Collection
+The models were tested against a series of reverse engineering capture-the-flag-style challenges, each with a 39-character flag in the format `flag_{<random hexadecimal value>}`, with each level introducing additional reverse engineering complexity:
 
-**Goal:** Boot a real guest Linux VM under QEMU, then (eventually) run a sample with basic tracing. Start simple and grow.
+1. Simple plaintext string hardcoded into the program
+2. The flag is generated on the stack at runtime
+3. The flag is encrypted with a simple single-byte XOR, decrypted at runtime
+4. The flag is encrypted with a stream cipher and is never decrypted; instead, the user's input is encrypted for comparison
+5. The flag is encrypted with a more advanced cipher algorithm
+6. The program introduces a simple SIGTRAP-based anti-debugging mechanism
 
-##### 3.1 – Boot a real Linux guest under QEMU from code
-- [x] Create or pick a qcow2 Linux image (minimal distro).
-- [x] Verify QEMU command line manually boots the guest.
-- [x] Update `QEMUController` to use the “real guest” command line.
-- [x] Start/stop the guest VM from `main.cpp`.
+Each model was tested against each level over 20 runs, each with a maximum of 10 iterations. Across the six challenge levels, 240 total analysis runs were conducted to evaluate success rate, convergence behavior, and performance as reverse engineering complexity increased.
 
-##### 3.2 – Prepare the guest environment
-- [x] Install `strace` (or equivalent) in the guest.
-- [x] Set up SSH in the guest (optional but recommended).
-- [x] Configure QEMU networking with host port forwarding to guest SSH (e.g. host `10022` → guest `22`).
+### Results
 
-##### 3.3 – Implement RuntimeManager::runFirstPass (v0)
-- [x] Add `RuntimeManager` implementation file.
-- [x] Implement `runFirstPass(const std::string& samplePath)`:
-  - [x] Start VM (restore baseline later; for now just boot).
-  - [x] Connect QMP and wait for “running”.
-  - [x] (Later) Copy sample into guest.
-  - [x] (Later) Invoke guest script to run sample under `strace`.
-  - [x] (Later) Fetch trace file back to host.
+Both models showed a clear decline in effectiveness as challenge difficulty increased, both in overall success rate and in the number of iterations required for successful runs. At Level 1, both models achieved a 100% success rate. By Level 6, Claude failed to complete any of the 20 runs successfully, while ChatGPT retained a 55% success rate. The results demonstrate that increasing reverse engineering complexity affected both models substantially, while also revealing significant differences in their robustness and ability to converge under more demanding analysis conditions.
 
-##### 3.4 – Integrate basic tracing
-- [x] Decide on a host→guest mechanism (SSH, virtio-serial, shared folder, etc.).
-- [x] Execute `strace -f -o /tmp/sample.strace ./sample` inside guest.
-- [x] Retrieve `/tmp/sample.strace` to `artifacts/<sample>/run1/`.
-- [x] Implement a minimal `TraceCollector` to summarize syscalls.
----
+### Publication
 
-#### :white_check_mark: Milestone 4 – GDB Remote Controller & Second Run (No LLM Yet)
+Schoolcraft, A., Payne, B. (2026). *An AI-Assisted Framework for Automated Malware Reverse Engineering and Analysis*. In: Arai, K. (eds) Proceedings of the Future Technologies Conference (FTC) 2026. October 13-14, 2026, Berlin, Germany. Lecture Notes in Networks and Systems (accepted, in press). Springer, Cham.
 
-**Goal:** Scriptable control of a debugged process inside QEMU via GDB remote protocol.
+### Paper Abstract
 
-- [x] Extend QEMU launch options
-  - [x] Add `-gdb tcp:localhost:1234 -S` (or `-s -S`) for debug runs
-  - [x] Ensure VM halts at startup and waits for debugger
-- [x] Implement `GdbRemoteController`
-  - [x] Connect to `localhost:1234`
-  - [x] Implement minimal packet send/receive (RSP – Remote Serial Protocol)
-  - [x] Implement:
-    - [x] `getStopReason()`
-    - [x] `readRegisters()`
-    - [x] `continueExecution()` (`c`)
-    - [x] `stepInstruction()` (`s`)
-  - [x] Implement setting and removing a software breakpoint at a given address (`Z0`/`z0`)
-- [x] Simple demo flow (hard-coded)
-  - [x] Restore `baseline_clean`
-  - [x] Launch QEMU in debug mode
-  - [x] Set a breakpoint at a known address in a toy program
-  - [x] Run program, confirm breakpoint hit
-  - [x] Log registers and resume
-- [x] Integrate with `RuntimeManager`
-  - [x] Add `runSecondPassDebug()` that:
-    - [x] Uses `QemuController` to start in debug mode
-    - [x] Uses `GdbRemoteController` to apply a hard-coded debug plan
-- [x] Document basic RSP usage and demo in README
 
----
+> This paper presents an experimental framework for evaluating Large Language Model
+> (LLM)-assisted reverse engineering and debugging within a controlled, iterative analysis environment.
+> The system integrates lightweight static analysis tools, dynamic execution under GDB and
+> QEMU, and LLM-guided reasoning into a bounded closed-loop workflow.
+> 
+> Evaluation was conducted using a six-level reverse engineering challenge dataset, with each
+> level introducing increasing complexity, including runtime transformations and anti-debugging
+> behavior. Two LLM systems were evaluated across 240 total runs using fixed prompts and iteration
+> limits to ensure reproducibility.
+> 
+> Results show that LLMs perform effectively on lower-complexity tasks, achieving high
+> success rates with minimal iterations. However, performance degrades significantly as complexity
+> increases, particularly in scenarios involving multi-step reasoning and adversarial execution conditions.
+> Comparative analysis reveals differences in model stability, convergence behavior, and
+> robustness under constrained iterative conditions.
+> 
+> The study identifies key failure patterns, including iteration exhaustion, incorrect reasoning
+> persistence, hallucinated actions, and partial solution convergence. These findings highlight both
+> the potential and current limitations of LLM-guided debugging.
+> 
+> Overall, this work provides a structured methodology for evaluating LLM performance in
+> binary analysis contexts and demonstrates that while LLMs are valuable assistive tools, further
+> advancements are required for reliable application in complex reverse engineering workflows.
 
-#### :bangbang: Milestone 5 – LLM Interface & Debug Plan Schema
+## Implementation
 
-**Goal:** Let the LLM propose a structured “debug plan” based on first-run traces.
+The framework is implemented primarily in C++, with Python used for communication with external LLM APIs. The C++ runtime is responsible for orchestration, virtualized execution, artifact collection, debugger interaction, and management of the iterative analysis workflow, while the Python integration layer handles model-specific API requests and responses.
 
-- [x] Define a JSON schema for an LLM “debug plan”
-  - [x] Breakpoints (addresses, reasons)
-  - :exclamation: Patches (address + bytes or semantic action)
-  - [x] Snapshot triggers (when/where to snapshot)
-  - [x] Branch exploration hints (“explore alternative path at location X”)
-- [x] Implement `LlmInterface`
-  - [x] Define `DebugPlan LlmInterface::generateDebugPlan(const TraceSummary& summary, /* static info later */)`
-  - [x] For now, stub in a fake implementation that returns a hard-coded plan
-  - [x] Later, connect to actual LLM API/tooling
-- [x] RuntimeManager integration
-  - [x] Add `runTwoPhaseAnalysis(const std::string& samplePath)`:
-    - [x] Call `runFirstPass()` → get `TraceSummary`
-    - [x] Call `LlmInterface::generateDebugPlan()` → get `DebugPlan`
-    - [x] Call `runSecondPassDebug(DebugPlan)` to apply it via `GdbRemoteController`
-- [x] Logging
-  - [x] Log plan + results (which breakpoints hit, which patches applied)
-  - [x] Store under `artifacts/<sample_name>/run2/`
-- [x] Update README with:
-  - [x] Description of the LLM role
-  - [x] Example debug plan JSON
+The runtime is organized around several primary components:
 
----
+- `RuntimeManager` — coordinates sample preparation, static and dynamic analysis, and the iterative LLM reasoning loop.
+- `QemuController` — manages the isolated QEMU analysis environment.
+- `TraceCollector` — collects runtime traces and analysis artifacts.
+- `SshHelper` — manages command execution and artifact transfer between the host and analysis environment.
+- `LlmInterface` — provides the interface between the runtime and supported LLM providers.
+- `Logger` — records execution events and model interactions for later analysis.
 
-#### :white_large_square: Milestone 6 – Branch Exploration & Remaining Runs
+For each analysis run, the target binary is loaded into an isolated Linux x86-64 QEMU environment. The framework first collects static artifacts using tools such as `strings`, `readelf`, and `objdump`, followed by dynamic analysis using GDB and runtime tracing utilities. Collected artifacts are returned to the host and incorporated into the context provided to the selected LLM.
 
-**Goal:** Iterate over multiple debug plans to explore alternate branches and collect snapshots.
+The LLM then generates a GDB analysis strategy, which is executed against the target. Runtime results are returned to the model as feedback, allowing it to refine its approach iteratively:
 
-- [ ] Extend `DebugPlan` to support multiple “scenarios” or branches
-  - [ ] Each scenario = a specific combination of breakpoints/patches to explore a path
-- [ ] Add branch-aware control to `RuntimeManager`
-  - [ ] For each scenario:
-    - [ ] Restore `baseline_clean`
-    - [ ] Start debug run
-    - [ ] Apply scenario’s plan via `GdbRemoteController`
-    - [ ] Collect snapshots and logs
-- [ ] LLM feedback loop
-  - [ ] Allow LLM to:
-    - [ ] See which branches were already explored
-    - [ ] Propose next branches/scenarios
-- [ ] Artifacts & reporting
-  - [ ] Organize per-scenario results in `artifacts/<sample_name>/branches/`
-  - [ ] Generate a high-level report summarizing discovered behaviors
-- [ ] README
-  - [ ] Add a section on “Branch exploration workflow”
-  - [ ] Include a small example of multiple scenarios on a toy program
-
----
-
-#### :white_large_square: Milestone 7 – (Later) UI / Visualization (Optional for Thesis Core)
-
-**Goal:** Provide a user-friendly front-end on top of the working backend.
-
-- [ ] Basic CLI quality-of-life
-  - [ ] Commands like:
-    - [ ] `analyze <sample>`
-    - [ ] `run-first-pass <sample>`
-    - [ ] `run-second-pass <sample>`
-  - [ ] Flags for specifying image, snapshot, timeouts
-- [ ] Optional GUI / Web UI (stretch goal)
-  - [ ] Visualize:
-    - [ ] Timeline of runs & breakpoints
-    - [ ] Syscall frequency charts
-    - [ ] Snapshot list & metadata
-  - [ ] Buttons to trigger new analyses / scenarios
-- [ ] Documentation
-  - [ ] User guide for running analyses
-  - [ ] Developer guide for extending the system
-
----
-
-### Roadmap Issues
-
-#### :white_check_mark: Milestone 2
-
-- [x] Snapshot QEMU/QMP commands (savevm/loadvm) not found
- 
----
-
-#### :white_large_square: Milestone 5
-
-- [ ] Additional fields/interupt types for DebugPlan schema JSON
-    - [ ] Memory read/write commands
-    - [ ] Byte patching commands
-    - [ ] Anti-disassembly / obfuscation handling commands
-    - [ ] Encryption/decryption handling commands
-
-### Development Notes
-
-- Snapshot commands failed in minimal test environment; need to verify QEMU build has snapshot support, and how to invoke them correctly.
-    - Problem fixed by using qcow2 images and proper QEMU options ('-snapshot', creating per-sample image files). 
----
-- During Milestone 3, decided to work a major refactor of "RuntimeManager" to allow for a single orchestration function that can be called
- in CLI with most of the info to configure the run passed in as parameters. This should simplify the UI portion significantly.
-- Additionally, switched from using a Fedora Server image to a minimal Debian cloud image for the QEMU guest - greatly reduced boot time per cycle
-    - Further optimized run by refactoring groups of processes together, such as all of the static tools are run in the same instance as the diff, etc. This reduced the number of boot cycles required.
-    - Total run time for full analysis at roughly 5 minutes per sample through Milestone 3, down from about 10-15 minutes.
----
--  During Milestone 4, modified the GDB pipeline to create a GDB script on-the-fly that is passed to GDB at runtime, rather than issuing commands one at a time over the RSP connection.
-    - This greatly simplified the GDBRemoteController implementation, as it no longer needs to handle the full RSP protocol.
-    - Additionally, this allows for easier debugging of the GDB commands themselves, as the script can be inspected directly.
-    - Script generation is currently very basic, but can be expanded in future milestones to support more complex plans from the LLM.
-    - GdbScriptGenerator class builds the script based on a JSON debug plan input - this JSON will be wired up to be created by the LLM based on the earlier artifacts
-
----
-- During Milestone 5, created a basic LLM interface that currently stubs out a hard-coded debug plan.
-    - The DebugPlan schema was defined in JSON, with fields for breakpoints, patches, and snapshot triggers.
-    - Updated RuntimeManager to include a two-phase analysis function that ties together the first pass trace collection
-    - Major portion of Milestone 5 was spent fine-tuning the prompt for the LLM to generate the correct JSON plan, while maintaining enough generalization to work for other samples, rather than overfitting to the test sample used.
-    - Future work will involve refining the prompt and possibly adding more context to improve plan quality, including adding additional patern recognitions for various other evasion, obfuscation, anti-RE (debug and/or disassembly), and encryption
-    - Also fixed a long-standing issue with running a sample that has an image already - the code to set the image file for the run was embedded in the prepare section, so it was never hit if the image already exists
----
-
-## Core
-
-### Development Roadmap
-
-High-level design of core components and their interactions.
-
-#### Milestone 0 – Project Skeleton & Scaffolding
-```
-TODO: figure out milestones for core components and their interactions within and without the CoreEngine.
+```text
+Target Binary
+     ↓
+Static Artifact Collection
+     ↓
+LLM Analysis / GDB Strategy
+     ↓
+QEMU + GDB Execution
+     ↓
+Runtime Artifacts
+     ↓
+LLM Feedback / Refinement
+     ↺
 ```
 
----
----
+Analysis continues until the target is successfully solved, a terminal failure occurs, or the configured iteration limit is reached. For the experiments reported in this research, each run was bounded to 10 iterations to provide a consistent and reproducible evaluation environment.
 
-## UI
+## Repository Structure
 
-### Development Roadmap
-
-High-level design of UI components and their interactions.
-
-#### Milestone 0 – Project Skeleton & Scaffolding
+```tree
+guardAInDBG
+│   LICENSE
+│   README.md
+│
+├───Code
+│   └───Runtime
+│       ├───include
+│       │       LLMInterface.h
+│       │       Logger.h
+│       │       QEMUController.h
+│       │       QemuMonitorClient.h
+│       │       QmpClient.h
+│       │       RuntimeConfig.h
+│       │       RuntimeManager.h
+│       │       SshHelper.h
+│       │       TraceCollector.h
+│       │
+│       ├───prompts
+│       │       instructions.txt
+│       │
+│       ├───scripts
+│       │       generate_plan.py
+│       │       requirements.txt
+│       │
+│       └───src
+│               LLMInterface.cpp
+│               Logger.cpp
+│               main.cpp
+│               QEMUController.cpp
+│               QemuMonitorClient.cpp
+│               QmpClient.cpp
+│               RuntimeManager.cpp
+│               SshHelper.cpp
+│               TraceCollector.cpp
+│
+├───docs
+│   │   arch.md
+│   │   DEVELOPMENT.md
+│   │   model_structure.md
+│   │   roles.md
+│   │   user_stories.md
+│   │   use_cases.md
+│   │
+│   └───Diagrams
+│       └───Runtime
+│               components.md
+│               data_models.md
+│               dependencies.md
+│               env_states.md
+│               error_flow.md
+│               runtime_api.md
+│               runtime_arch.jpeg
+│               runtime_execution_flow.jpeg
+│               sequences.md
+│               target_states.md
+│
+└───external
+    └───nlohmann
+            json.hpp
 ```
-TODO: figure out milestones for UI components and their interactions.
+
+## Requirements
+
+guardAInDBG was developed as a research prototype and requires a configured
+virtualized analysis environment. The original experimental environment used
+the following components:
+
+### Host Environment
+
+- Windows host system
+- Visual Studio with C++ development tools / MSVC
+- QEMU x86-64 system emulator
+- Python 3
+- OpenAI and/or Anthropic API credentials set as environment variables`OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY`, respectively
+- SSH/SCP access to the analysis VM
+
+### Analysis Environment
+
+- Alpine Linux x86-64 QCOW2 image
+- GDB
+- `file`
+- `sha256sum`
+- `strings`
+- `binwalk`
+- `readelf`
+- `objdump`
+- `tcpdump`
+- `strace`
+- `tshark`
+- `ltrace`
+
+### Research Dataset
+
+The experiments described in the associated research used the six-level
+Escalate reverse engineering challenge set. Challenge binaries and the
+configured analysis VM are not distributed with this repository.
+
+### LLM Integration
+
+API credentials are required for the model provider being evaluated:
+
+- OpenAI API key for OpenAI models
+- Anthropic API key for Claude models
+
+Provider credentials and other machine-specific configuration should be
+supplied locally and are not included in the repository.
+
+### Python Dependencies
+
+The LLM integration layer requires Python 3 and the official OpenAI and
+Anthropic Python SDKs:
+
+```bash
+pip install -r Code/Runtime/scripts/requirements.txt
 ```
 
----
----
+## Usage
 
-## MCP
+Once the host and analysis environment have been configured, guardAInDBG can be executed from the command line against a target sample.
 
-### Development Roadmap
-
-High-level design of MCP components and their interactions.
-
-#### Milestone 0 – Project Skeleton & Scaffolding
+```bash
+guardAInDBG.exe <sample executable>
+  --openai-model <model> 
+  --claude-model <model> 
+  --single-model <model> 
+  --openai-only
+  --claude-only
+  --reuse-artifacts
 ```
-TODO: figure out milestones for MCP components and their interactions.
-```
 
-
+| Flag | Purpose |
+|------|---------|
+|  `<sample executable>` | Target binary to analyze |
+| `--openai-model <model>` | Specifies the specific OpenAI model to use for analysis, defaults to gpt-5-mini |
+| `--claude-model <model>` | Specifies the specific Anthropic model to use for analysis, defaults to claude-sonnet-3-5-20241022 |
+| `--single-model <model>` | Uses only the one specific model, used in conjunction with `--openai-only` or `--claude-only` to specify model |
+| `--openai-only` | Only use OpenAI API for LLM |
+| `--claude-only` | Only use Anthropic API for LLM |
+| `--reuse-artifacts` | Bypass initial static and dynamic passes, reusing artifacts from prior analysis sessions |
 
 ## License
 

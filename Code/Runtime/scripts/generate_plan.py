@@ -21,9 +21,6 @@ import json
 import re
 from pathlib import Path
 
-from httpx import request
-
-
 # OLD APPROACH: Extract JSON from LLM response (not needed for GDB script generation)
 # def extract_json_from_response(response_text):
 #     """
@@ -232,19 +229,6 @@ def generate_gdb_script_with_claude(prompt_content, api_key=None, model=None, co
         print(f"ERROR: Failed to call Claude API: {e}", file=sys.stderr)
         sys.exit(1)
 
-
-def generate_gdb_script_with_cursor_api(prompt_content):
-    """
-    Generate GDB script using Cursor's API (if available).
-    
-    NOTE: This is a placeholder. Cursor's API access requires special setup.
-    You may need to use Cursor's MCP server or modify this to work with your setup.
-    """
-    print("ERROR: Cursor API integration not yet implemented.", file=sys.stderr)
-    print("Please use OpenAI API or implement Cursor API integration.", file=sys.stderr)
-    sys.exit(1)
-
-
 def main():
     if len(sys.argv) < 3 or len(sys.argv) > 9:
         print("Usage: python generate_plan.py <prompt_file> <output_gdb_file> [api_key] [previous_response_id] [gdb_log_file] [model] [provider] [conversation_history_file]", file=sys.stderr)
@@ -305,9 +289,6 @@ def main():
     response_id = None
     updated_messages = None  # For Anthropic conversation history
     
-    if use_cursor:
-        print("Using Cursor API (if available)...", file=sys.stderr)
-        gdb_script = generate_gdb_script_with_cursor_api(prompt_content)
     elif llm_provider == "claude" or llm_provider == "anthropic":
         # Use model from command line or environment, default to claude-3-5-sonnet-20241022
         model = model_override if model_override else os.environ.get("LLM_MODEL", "claude-3-5-sonnet-20241022")

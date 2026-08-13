@@ -105,7 +105,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)external;$(ProjectDir)Code\Runtime\include;$(ProjectDir)Code\Core\include;$(ProjectDir)Code\MCP\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)external;$(ProjectDir)Code\Runtime\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -121,7 +121,7 @@
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)external;$(ProjectDir)Code\Runtime\include;$(ProjectDir)Code\Core\include;$(ProjectDir)Code\MCP\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)external;$(ProjectDir)Code\Runtime\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -129,9 +129,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Code\Core\include\AnalysisCoordinator.h" />
-    <ClInclude Include="Code\MCP\include\McpSidecar.h" />
-    <ClInclude Include="Code\MCP\include\McpSidecarConfig.h" />
     <ClInclude Include="Code\Runtime\include\LlmInterface.h" />
     <ClInclude Include="Code\Runtime\include\Logger.h" />
     <ClInclude Include="Code\Runtime\include\QemuController.h" />
@@ -141,14 +138,8 @@
     <ClInclude Include="Code\Runtime\include\RuntimeManager.h" />
     <ClInclude Include="Code\Runtime\include\SshHelper.h" />
     <ClInclude Include="Code\Runtime\include\TraceCollector.h" />
-    <ClInclude Include="framework.h" />
-    <ClInclude Include="guardAInDBG.h" />
-    <ClInclude Include="Resource.h" />
-    <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Code\Core\src\AnalysisCoordinator.cpp" />
-    <ClCompile Include="Code\MCP\src\McpSidecar.cpp" />
     <ClCompile Include="Code\Runtime\src\LlmInterface.cpp" />
     <ClCompile Include="Code\Runtime\src\Logger.cpp" />
     <ClCompile Include="Code\Runtime\src\main.cpp" />
@@ -158,13 +149,6 @@
     <ClCompile Include="Code\Runtime\src\RuntimeManager.cpp" />
     <ClCompile Include="Code\Runtime\src\SshHelper.cpp" />
     <ClCompile Include="Code\Runtime\src\TraceCollector.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="guardAInDBG.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="guardAInDBG.ico" />
-    <Image Include="small.ico" />
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" />

@@ -28,6 +28,8 @@ mcp_py/**/*.pyc
 *.db-shm
 *.db-wal
 
+RCa03428
+
 
 # ============================================================
 # C/C++ build output
@@ -99,6 +101,7 @@ results/
 logs/
 
 # ============================================================
-# System-specific clearance file
+# System-specific files
 # ============================================================
 add-defender-exclusion.ps1
+config/config.json
