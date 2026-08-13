@@ -1,20 +1,104 @@
-mcp_py/.venv
+# ============================================================
+# Python / MCP environment
+# ============================================================
+mcp_py/.venv/
+mcp_py/__pycache__/
+mcp_py/**/*.pyc
+*.py[cod]
 
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+
+# ============================================================
 # Visual Studio user-specific files
+# ============================================================
 .vs/
 *.user
 *.userosscache
 *.suo
 
-# Visual Studio generated files
+# Visual Studio generated databases / caches
 *.VC.db
 *.VC.opendb
 *.ipch
+*.opendb
+*.db-shm
+*.db-wal
 
-# Build output
+
+# ============================================================
+# C/C++ build output
+# ============================================================
 bin/
 obj/
+Debug/
 Debug*/
+Release/
 Release*/
 x64/
 x86/
+
+*.obj
+*.o
+*.pch
+*.pdb
+*.idb
+*.ilk
+*.tlog
+*.lastbuildstate
+*.log
+
+# Compiled binaries
+*.exe
+*.dll
+*.lib
+*.exp
+
+
+# ============================================================
+# Python-generated artifacts
+# ============================================================
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+
+# ============================================================
+# Local / temporary files
+# ============================================================
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+
+# ============================================================
+# Research / paper artifacts
+# ============================================================
+# Manuscript and publication files are intentionally excluded
+# from the software repository.
+paper/
+papers/
+manuscript/
+manuscripts/
+
+
+# ============================================================
+# Local analysis / generated output
+# ============================================================
+output/
+outputs/
+results/
+logs/
+
+# ============================================================
+# System-specific clearance file
+# ============================================================
+add-defender-exclusion.ps1
