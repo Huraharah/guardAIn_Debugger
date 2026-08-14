@@ -120,6 +120,7 @@ guardAInDBG
 │
 ├───Code
 │   └───Runtime
+│       │     config.example.json
 │       ├───include
 │       │       LLMInterface.h
 │       │       Logger.h
@@ -232,7 +233,9 @@ pip install -r Code/Runtime/scripts/requirements.txt
 
 ## Usage
 
-Once the host and analysis environment have been configured, guardAInDBG can be executed from the command line against a target sample.
+Copy `config.example.json` to `config.json` and update the local paths for QEMU, the analysis VM, and SSH key.
+
+Once the host and analysis environment have been configured, and the `config.json` created, guardAInDBG can be executed from the command line against a target sample.
 
 ```bash
 guardAInDBG.exe <sample executable>
