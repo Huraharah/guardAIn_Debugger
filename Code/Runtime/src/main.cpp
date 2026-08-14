@@ -106,8 +106,8 @@ int main(int argc, char* argv[])
 			sampleSet = true;
 		}
 		else if (arg == "--help" || arg == "-h") {
-			std::cout << "Usage: " << argv[0] << "\n" <<
-				"  <sample executable> \n" <<
+			std::cout << "Usage: " << argv[0] << "<sample executable> [options]\n" <<
+				"  Options: \n" <<
 				"  --openai-model <model> \n" <<
 				"  --claude-model <model> \n" <<
 				"  --single-model <model> \n" <<
