@@ -6,6 +6,10 @@
 
 Research prototype developed for M.S. Thesis evaluation. This repository represents the experimental implementation and is not intended as a production malware-analysis program.
 
+### Important note
+
+The code in this repository is preserved substantially as it existed at the completion of my M.S. thesis project. Changes made since the completion of the research are limited to minor portability improvements, removal of machine-specific or personal information, and additional documentation for users.
+
 ## Overview
 
 This project uses a QEMU-based virtualized environment running Alpine Linux to perform automated static and dynamic analysis on a series of capture-the-flag-style reverse engineering challenges that increase in complexity across successive levels. The system programmatically collects static-analysis artifacts using tools such as `binwalk`, `objdump`, and `strings`, then combines those artifacts with task-specific instructions to construct a prompt for the selected LLM. The model's response is constrained to a GDB script, which is executed against the challenge binary in an attempt to extract and validate the flag. Results from each attempt are then incorporated into subsequent prompts, creating an iterative feedback loop that allows the model to refine its analysis and debugging strategy.
