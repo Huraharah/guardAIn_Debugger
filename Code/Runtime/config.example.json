@@ -1,0 +1,6 @@
+{
+  "qemuBinary": "<PATH_TO_QEMU>\\qemu-system-x86_64.exe",
+  "baseImagePath": "<PATH_TO_VM_IMAGE>\\linux_base.qcow2",
+  "vmDirectory": "<PATH_TO_VM_DIRECTORY>\\",
+  "sshKeyPath": "<PATH_TO_SSH_KEY>"
+}
