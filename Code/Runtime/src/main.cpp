@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
 	
 	// Parse command line arguments
 	cfg_.runBothModels = true;  // Default to running both models
-	cfg_.sampleName = "suspicious";  // Default sample name
+	bool sampleSet = false;
 	
 	for (int i = 1; i < argc; i++) {
 		std::string arg = argv[i];
@@ -103,7 +103,39 @@ int main(int argc, char* argv[])
 			// Positional argument: sample name
 			cfg_.sampleName = arg;
 			Logger::info("[GuardAInDBG Runtime] Using sample from command line: " + cfg_.sampleName);
+			sampleSet = true;
 		}
+		else if (arg == "--help" || arg == "-h") {
+			std::cout << "Usage: " << argv[0] << "\n" <<
+				"  <sample executable> \n" <<
+				"  --openai-model <model> \n" <<
+				"  --claude-model <model> \n" <<
+				"  --single-model <model> \n" <<
+				"  --openai-only \n" <<
+				"  --claude-only \n" <<
+				"  --reuse-artifacts \n" <<
+				"== See README for explanation of flags ==" << std::endl;
+
+			return 0;
+		}
+
+		else {
+    		Logger::error("[GuardAInDBG Runtime] Unknown option: " + arg);
+    		std::cerr << "Use --help or -h for usage information.\n";
+    		return 1;
+}
+				
+				
+	}
+
+	if (!sampleSet) {
+		Logger::error("Sample Name not set");
+		std::cerr
+            << "Usage: " << argv[0]
+            << " <sample executable> [options]\n"
+            << "Use --help or -h for additional options.\n";
+		
+		return 1;
 	}
 	
 	if (cfg_.runBothModels) {
