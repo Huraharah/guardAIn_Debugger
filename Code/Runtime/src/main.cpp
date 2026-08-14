@@ -1,5 +1,44 @@
 #include <iostream>
+#include <fstream>
+
 #include "RuntimeManager.h"
+#include "../../external/nlohmann/json.hpp"
+
+using json = nlohmann::json;
+
+bool loadRuntimeConfig(const std::string& path, RuntimeConfig& cfg)
+{
+    std::ifstream file(path);
+
+    if (!file.is_open()) {
+        Logger::error("[GuardAInDBG Runtime] Unable to open config file: " + path);
+        return false;
+    }
+
+    try {
+        json j;
+        file >> j;
+
+        cfg.qemuBinary    = j.at("qemuBinary").get<std::string>();
+        cfg.baseImagePath = j.at("baseImagePath").get<std::string>();
+        cfg.vmDirectory   = j.at("vmDirectory").get<std::string>();
+        cfg.sshKeyPath    = j.at("sshKeyPath").get<std::string>();
+
+		// Print config confirmations
+		Logger::debug("[GuardAInDBG Runtime] QEMU: " + cfg_.qemuBinary);
+		Logger::debug("[GuardAInDBG Runtime] VM image: " + cfg_.baseImagePath);
+		Logger::debug("[GuardAInDBG Runtime] VM directory: " + cfg_.vmDirectory);
+		Logger::debug("[GuardAInDBG Runtime] SSH key: " + cfg_.sshKeyPath);
+    }
+    catch (const json::exception& e) {
+        Logger::error(
+            std::string("[GuardAInDBG Runtime] Invalid config file: ") + e.what()
+        );
+        return false;
+    }
+
+    return true;
+}
 
 int main(int argc, char* argv[])
 {
@@ -10,11 +49,21 @@ int main(int argc, char* argv[])
 #endif
 
 	RuntimeConfig cfg_;
-    cfg_.qemuBinary = "A:\\QEMU\\qemu-system-x86_64.exe";
-    cfg_.baseImagePath = "A:\\VMs\\linux_base.qcow2";   
-	cfg_.vmDirectory = "A:\\VMs\\";
-	cfg_.artifactsRoot = "A:\\artifacts\\";
-    cfg_.sampleDirectory = "A:\\Samples\\";
+
+	// Portable defaults
+	cfg_.artifactsRoot = ".\\artifacts\\";
+    cfg_.sampleDirectory = ".\\Samples\\";
+	cfg_.sshHost = "127.0.0.1";
+	cfg_.sshPort = 10022;
+	cfg_.sshUser = "analyst";
+
+	// Machine-Specific configuration
+    if (!loadRuntimeConfig("config.json", cfg_)) {
+        Logger::error(
+            "[GuardAInDBG Runtime] Failed to load runtime configuration."
+        );
+        return 1;
+    }
 	
 	// Parse command line arguments
 	cfg_.runBothModels = true;  // Default to running both models
@@ -50,14 +99,6 @@ int main(int argc, char* argv[])
 			cfg_.cleanRun = false;
 			Logger::info("[GuardAInDBG Runtime] Reuse artifacts mode: will skip static analysis and reuse existing artifacts");
 		}
-		else if (arg == "--no-mcp-sidecar") {
-			cfg_.mcpSidecarEnabled = false;
-			Logger::info("[GuardAInDBG Runtime] MCP/Ghidra static sidecar disabled");
-		}
-		else if (arg == "--ghidra" && i + 1 < argc) {
-			cfg_.ghidraInstallDir = argv[++i];
-			Logger::info("[GuardAInDBG Runtime] Ghidra install dir: " + cfg_.ghidraInstallDir);
-		}
 		else if (arg[0] != '-') {
 			// Positional argument: sample name
 			cfg_.sampleName = arg;
@@ -70,10 +111,6 @@ int main(int argc, char* argv[])
 	} else {
 		Logger::info("[GuardAInDBG Runtime] Single-model mode: " + cfg_.llmModel);
 	}
-	cfg_.sshHost = "127.0.0.1";
-	cfg_.sshPort = 10022;
-	cfg_.sshUser = "analyst";
-	cfg_.sshKeyPath = "A:\\guardain_ed25519";
 
 	Logger::info("[GuardAInDBG Runtime] Starting");
 	Logger::debug("[GuardAInDBG Runtime] Debug information enabled");
