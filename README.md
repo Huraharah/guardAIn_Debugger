@@ -175,6 +175,9 @@ guardAInDBG
 │               sequences.md
 │               target_states.md
 │
+├───Escalate_Samples
+│   └───11 Linux-based samples used in research
+|
 └───external
     └───nlohmann
             json.hpp
@@ -213,8 +216,7 @@ the following components:
 ### Research Dataset
 
 The experiments described in the associated research used the six-level
-Escalate reverse engineering challenge set. Challenge binaries and the
-configured analysis VM are not distributed with this repository.
+Escalate reverse engineering challenge set. All 11 levels of the Linux set are included for reproduction, however the configured VMs are not.
 
 ### LLM Integration
 
